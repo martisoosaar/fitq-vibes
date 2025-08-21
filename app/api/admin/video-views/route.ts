@@ -21,7 +21,15 @@ export async function GET(req: NextRequest) {
     // Get video views with related data
     const videoViews = await prisma.videoView.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        videoId: true,
+        userId: true,
+        watchTimeSeconds: true,
+        playheadPosition: true,
+        stillWatching: true,
+        createdAt: true,
+        updatedAt: true,
         video: {
           select: {
             id: true,

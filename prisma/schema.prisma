@@ -312,7 +312,9 @@ model VideoView {
   videoId               Int
   userId                Int
   trainerId             Int?
-  watchTimeSeconds      Int
+  watchTimeSeconds      Int      @default(0)
+  playheadPosition      Float    @default(0) // Current position in the video (seconds)
+  stillWatching         Boolean  @default(true) // Is the viewing session still active
   caloriesBurned        Int?
   paid                  Boolean  @default(false)
   userCash              Float    @default(0.000)
@@ -328,6 +330,7 @@ model VideoView {
   @@index([videoId], map: "videoId")
   @@index([userId], map: "userId")
   @@index([trainerId], map: "trainerId")
+  @@index([stillWatching], map: "stillWatching")
 }
 
 model ImpersonationToken {

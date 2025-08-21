@@ -62,9 +62,12 @@ export async function GET(request: NextRequest) {
     // Build order by
     let orderBy: any = {}
     let includeCommentCount = false
+    let needsPostSort = false
     switch (sort) {
       case 'popular':
-        orderBy = { views: 'desc' }
+        // For popular, we need to sort by view count after fetching
+        needsPostSort = true
+        orderBy = { createdAt: 'desc' }
         break
       case 'longest':
         orderBy = { duration: 'desc' }
@@ -78,7 +81,8 @@ export async function GET(request: NextRequest) {
       case 'most-commented':
         // For most commented, we need to include comment count
         includeCommentCount = true
-        orderBy = { comments: { _count: 'desc' } }
+        needsPostSort = true
+        orderBy = { createdAt: 'desc' }
         break
       case 'newest':
       default:
@@ -90,7 +94,7 @@ export async function GET(request: NextRequest) {
       where,
       skip: offset,
       take: limit,
-      orderBy: sort === 'most-commented' ? { createdAt: 'desc' } : orderBy, // Temporary orderBy for most-commented
+      orderBy,
       include: {
         category: true,
         trainer: true,
@@ -114,14 +118,19 @@ export async function GET(request: NextRequest) {
           }
         },
         _count: {
-          select: { comments: true }
+          select: { 
+            comments: true,
+            viewsLog: true 
+          }
         }
       }
     })
     
-    // If sorting by most commented, sort the results
+    // Post-sort if needed
     if (sort === 'most-commented') {
       videos.sort((a, b) => (b as any)._count.comments - (a as any)._count.comments)
+    } else if (sort === 'popular') {
+      videos.sort((a, b) => (b as any)._count.viewsLog - (a as any)._count.viewsLog)
     }
 
     // Format video data
@@ -162,7 +171,7 @@ export async function GET(request: NextRequest) {
         } : null,
         languageId: video.languageId,
         thumbnail: thumbnail || '/images/video-placeholder.png',
-        views: video.views,
+        views: (video as any)._count?.viewsLog || 0,
         commentCount: (video as any)._count?.comments || 0,
         trainer: video.trainer ? {
           id: video.trainerId,

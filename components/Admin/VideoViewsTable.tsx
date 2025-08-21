@@ -8,7 +8,10 @@ interface VideoView {
   videoId: number
   userId: number
   watchTimeSeconds: number
+  playheadPosition: number
+  stillWatching: boolean
   createdAt: string
+  updatedAt: string
   video: {
     id: number
     title: string
@@ -97,6 +100,14 @@ export default function VideoViewsTable() {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date)
+  }
+  
+  const getCompletionPercentage = (playhead: number, watchTime: number, duration: number): number => {
+    if (duration === 0) return 0
+    // Use playhead if available, otherwise use watch time
+    const position = playhead > 0 ? playhead : watchTime
+    const percentage = Math.round((position / duration) * 100)
+    return Math.min(percentage, 100) // Cap at 100%
   }
   
   const calculateWatchPercentage = (watchTime: number, videoDuration: number): number => {
@@ -271,20 +282,28 @@ export default function VideoViewsTable() {
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-1 text-white">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      {formatDuration(view.watchTimeSeconds)}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-white">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        {formatDuration(view.watchTimeSeconds)}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Playhead: {formatDuration(Math.floor(view.playheadPosition || view.watchTimeSeconds))}
+                        {view.stillWatching && (
+                          <span className="ml-2 text-yellow-500">(Pooleli)</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-3 px-4">
                     <div className="w-24">
                       <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                        <span>{watchPercentage}%</span>
+                        <span>{getCompletionPercentage(view.playheadPosition, view.watchTimeSeconds, view.video.duration)}%</span>
                       </div>
                       <div className="h-2 bg-[#2c313a] rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-[#40b236] transition-all"
-                          style={{ width: `${watchPercentage}%` }}
+                          style={{ width: `${getCompletionPercentage(view.playheadPosition, view.watchTimeSeconds, view.video.duration)}%` }}
                         />
                       </div>
                     </div>

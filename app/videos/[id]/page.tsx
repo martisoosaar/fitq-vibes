@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, memo } from 'react'
-// import { useVimeoPlayer } from '../../../hooks/useVimeoPlayer'
+import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react'
+import { useVimeoPlayer } from '../../../hooks/useVimeoPlayer'
+import { useVimeoPlayerSimple } from '../../../hooks/useVimeoPlayerSimple'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Heart, Eye, Clock, Dumbbell, Volume2, Info, Share2, ChevronLeft, Lock } from 'lucide-react'
-// Removed video tracking import
+import WatchTimeDisplay from '../../../components/Video/WatchTimeDisplay'
+import ResumeModal from '../../../components/Video/ResumeModal'
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface Video {
@@ -107,11 +109,48 @@ function formatDate(dateString: string): string {
   return `${Math.floor(days / 365)} aasta tagasi`
 }
 
+// Memoized Vimeo iframe component to prevent re-renders
+const VimeoIframe = memo(({ iframeHtml, videoId }: { iframeHtml: string, videoId: number }) => {
+  const iframeRef = useRef<HTMLDivElement>(null)
+  
+  // Ensure the iframe has the API enabled
+  let modifiedHtml = iframeHtml
+    .replace(/width="\d+"/, 'width="100%"')
+    .replace(/height="\d+"/, 'height="100%"')
+    .replace('<iframe', '<iframe id="vimeo-player"')
+  
+  // Add api=1 parameter if not present
+  if (!modifiedHtml.includes('api=1')) {
+    modifiedHtml = modifiedHtml.replace(
+      /src="([^"]+)"/,
+      (match, url) => {
+        const separator = url.includes('?') ? '&' : '?'
+        return `src="${url}${separator}api=1"`
+      }
+    )
+  }
+  
+  return (
+    <div 
+      ref={iframeRef}
+      className="w-full h-full"
+      key={`iframe-${videoId}`}
+      dangerouslySetInnerHTML={{ 
+        __html: modifiedHtml
+      }}
+    />
+  )
+})
+
+VimeoIframe.displayName = 'VimeoIframe'
+
 export default function VideoPage() {
   const params = useParams()
   const router = useRouter()
   const videoRef = useRef<HTMLVideoElement>(null)
   const { user, isLoading: authLoading } = useAuth()
+  
+  console.log('🎥 VideoPage rendered, user:', user?.id, 'authLoading:', authLoading)
   
   const [video, setVideo] = useState<Video | null>(null)
   const [loading, setLoading] = useState(true)
@@ -122,26 +161,572 @@ export default function VideoPage() {
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isTimerPlaying, setIsTimerPlaying] = useState(false) // Separate state for timer
   const [showMusicList, setShowMusicList] = useState(false)
-  const iframeRef = useRef<HTMLDivElement>(null)
+  const [watchedTime, setWatchedTime] = useState(0)
   
-  // Removed Vimeo Player hook to simplify
+  // Debug watchedTime changes
+  useEffect(() => {
+    console.log('⏱️ watchedTime state changed to:', watchedTime)
+  }, [watchedTime])
+  const [resetWatch, setResetWatch] = useState(false)
+  const [videoPosition, setVideoPosition] = useState(0)
+  const [videoDuration, setVideoDuration] = useState(0)
+  const [viewId, setViewId] = useState<number | null>(null)
+  const [lastSavedTime, setLastSavedTime] = useState(0)
+  const [shouldResume, setShouldResume] = useState(false)
+  const [resumePosition, setResumePosition] = useState(0)
+  const [resumeWatchTime, setResumeWatchTime] = useState(0)
+  const [showResumeModal, setShowResumeModal] = useState(false)
+  const [resumeData, setResumeData] = useState<{
+    viewId: number
+    playheadPosition: number
+    watchTimeSeconds: number
+    updatedAt?: string
+  } | null>(null)
+  
+  // Check if user has access to watch the video
+  const hasAccess = useMemo(() => {
+    if (!video) return false
+    if (video.isFree) return true
+    if (!user) return false
+    if (video.openForSubscribers && user) return true
+    // For now, allow access to all logged-in users for testing
+    // TODO: Add proper subscription check
+    return !!user
+  }, [video, user])
+  
+  // Use Vimeo Player hook for iframe videos
+  const vimeoPlayer = useVimeoPlayer({
+    enabled: !!video?.iframe,
+    onPlay: () => {
+      console.log('VIMEO: Play event triggered')
+      setIsPlaying(true)
+      setIsTimerPlaying(true) // Start timer
+    },
+    onPause: () => {
+      console.log('VIMEO: Pause event triggered')
+      setIsPlaying(false)
+      setIsTimerPlaying(false) // Stop timer
+    },
+    onEnded: () => {
+      console.log('VIMEO: Ended event triggered')
+      setIsPlaying(false)
+      setIsTimerPlaying(false) // Stop timer
+    },
+    onTimeUpdate: (seconds) => {
+      // We track our own watched time, not video position
+    }
+  })
+  
+  // Also use simple Vimeo detector as fallback
+  const simpleVimeo = useVimeoPlayerSimple({
+    enabled: !!video?.iframe, // Enable immediately for iframe videos
+    onPlay: () => {
+      console.log('SIMPLE: Play detected!')
+      setIsTimerPlaying(true)
+    },
+    onPause: () => {
+      console.log('SIMPLE: Pause detected!')
+      setIsTimerPlaying(false)
+    },
+    onTimeUpdate: (seconds, duration) => {
+      // Only log every 10 seconds to avoid spam
+      if (Math.floor(seconds) % 10 === 0 && Math.floor(seconds) !== Math.floor(videoPosition)) {
+        console.log('SIMPLE: Time update received:', seconds.toFixed(1), '/', duration.toFixed(1))
+      }
+      setVideoPosition(seconds)
+      if (duration > 0) {
+        setVideoDuration(duration)
+      }
+    }
+  })
 
   
 
   useEffect(() => {
+    console.log('🔄 Main useEffect triggered for video:', params.id)
     fetchVideo()
     fetchComments()
+    // Reset watch timer when video changes
+    setWatchedTime(0)
+    setResetWatch(true)
+    setTimeout(() => setResetWatch(false), 100)
+    setViewId(null)
+    setLastSavedTime(0)
+    setHasCheckedSession(false) // Reset session check for new video
+    setSessionReady(false)
+    setShouldResume(false)
+    setResumePosition(0)
+    setResumeWatchTime(0)
+    setShowResumeModal(false)
+    setResumeData(null)
   }, [params.id])
+  
+  // Check for resumable session when page loads
+  const [hasCheckedSession, setHasCheckedSession] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
+  
+  useEffect(() => {
+    // Check for existing session when video and user are ready
+    if (!hasCheckedSession && video && user && hasAccess) {
+      console.log('🔍 Checking for existing viewing session')
+      checkForExistingSession()
+      setHasCheckedSession(true)
+    }
+  }, [hasCheckedSession, video?.id, user?.id, hasAccess])
+  
+  // Start new session when play is clicked (if no existing session)
+  useEffect(() => {
+    // Only start session when video is playing and session is ready
+    if (isTimerPlaying && sessionReady && !viewId && video && user && hasAccess) {
+      console.log('🎬 Video started playing, initiating new viewing session')
+      startViewingSession(false)
+    }
+  }, [isTimerPlaying, sessionReady, viewId, video?.id, user?.id, hasAccess])
+  
+  // Save progress when leaving page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (viewId) {
+        updateViewProgress()
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      // Save final progress when component unmounts
+      if (viewId) {
+        updateViewProgress()
+      }
+    }
+  }, [viewId, watchedTime, videoPosition])
+  
+  // Handle tab/window visibility changes
+  const [wasPlayingBeforeHidden, setWasPlayingBeforeHidden] = useState(false)
+  const [isTabSwitchResume, setIsTabSwitchResume] = useState(false)
+  
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden (user switched tab/window)
+        console.log('👁️ Page hidden, pausing video')
+        
+        // Remember if video was playing
+        if (isTimerPlaying) {
+          setWasPlayingBeforeHidden(true)
+          // Pause the video
+          setIsTimerPlaying(false)
+          
+          // Save progress
+          if (viewId) {
+            updateViewProgress()
+          }
+          
+          // Pause Vimeo player if it exists
+          const iframe = document.querySelector('iframe[src*="vimeo"]') as HTMLIFrameElement
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage(
+              JSON.stringify({ method: 'pause' }),
+              '*'
+            )
+          }
+          
+          // Pause HTML5 video if it exists
+          if (videoRef.current && !videoRef.current.paused) {
+            videoRef.current.pause()
+          }
+        }
+      } else {
+        // Page is visible again
+        console.log('👁️ Page visible again')
+        
+        // If video was playing before and user has an active session, show resume modal
+        if (wasPlayingBeforeHidden && viewId) {
+          setWasPlayingBeforeHidden(false)
+          
+          // Show resume modal with current position
+          setResumeData({
+            viewId: viewId,
+            playheadPosition: videoPosition,
+            watchTimeSeconds: watchedTime,
+            updatedAt: new Date().toISOString()
+          })
+          setIsTabSwitchResume(true)
+          setShowResumeModal(true)
+        }
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isTimerPlaying, viewId, videoPosition, watchedTime, wasPlayingBeforeHidden])
 
-  // Removed auto-play tracking for iframe videos
+  // Sync isPlaying state for Vimeo player
+  useEffect(() => {
+    if (video?.iframe && vimeoPlayer.isReady) {
+      console.log('🎬 Vimeo player state sync:', {
+        vimeoIsPlaying: vimeoPlayer.isPlaying,
+        isReady: vimeoPlayer.isReady,
+        currentIsPlaying: isPlaying
+      })
+      setIsPlaying(vimeoPlayer.isPlaying)
+    }
+  }, [vimeoPlayer.isPlaying, vimeoPlayer.isReady, video?.iframe])
+  
+  // Debug isPlaying changes
+  useEffect(() => {
+    console.log('🎮 isPlaying state changed to:', isPlaying)
+  }, [isPlaying])
+  
+  // Debug timer playing state
+  useEffect(() => {
+    console.log('⏰ isTimerPlaying state changed to:', isTimerPlaying)
+  }, [isTimerPlaying])
+  
+  // Handle video resume when player is ready
+  useEffect(() => {
+    if (shouldResume && resumePosition > 0) {
+      console.log('🔄 Attempting to resume video at position:', resumePosition)
+      
+      // For Vimeo player
+      if (video?.iframe && simpleVimeo.isReady) {
+        console.log('📺 Vimeo player is ready, seeking to:', resumePosition)
+        // Use postMessage to seek
+        const iframe = document.querySelector('iframe[src*="vimeo"]') as HTMLIFrameElement
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage(
+            JSON.stringify({ method: 'setCurrentTime', value: resumePosition }),
+            '*'
+          )
+          // Clear the resume flag after seeking
+          setShouldResume(false)
+        }
+      }
+      // For HTML5 video
+      else if (video?.playbackUrl && videoRef.current && videoRef.current.readyState >= 2) {
+        console.log('📺 HTML5 video ready, seeking to:', resumePosition)
+        videoRef.current.currentTime = resumePosition
+        setShouldResume(false)
+      }
+    }
+  }, [shouldResume, resumePosition, video, simpleVimeo.isReady, videoRef.current?.readyState])
 
-  // Removed vimeoTime and vimeoPlayer refs
-
-  // Removed all tab visibility tracking
+  // Handle watch time update
+  const handleWatchTimeUpdate = (seconds: number) => {
+    setWatchedTime(seconds)
+    
+    // Save progress every 10 seconds
+    if (seconds - lastSavedTime >= 10) {
+      console.log('⏰ Time to save progress:', seconds, 'last saved:', lastSavedTime, 'viewId:', viewId)
+      if (viewId) {
+        updateViewProgress()
+        setLastSavedTime(seconds)
+      } else {
+        console.log('❌ Cannot save progress - no viewId set')
+      }
+    }
+  }
+  
+  // Check for existing session on page load
+  const checkForExistingSession = async () => {
+    if (!user || !video) return
+    
+    console.log('🔍 Checking for existing session for video:', video.id)
+    
+    try {
+      const response = await fetch(`/api/videos/${video.id}/view/check`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('🔍 Session check result:', data)
+        
+        if (data.hasResumableSession && data.playheadPosition > 0) {
+          // Show modal for resumable session
+          setResumeData({
+            viewId: data.viewId,
+            playheadPosition: data.playheadPosition,
+            watchTimeSeconds: data.watchTimeSeconds,
+            updatedAt: data.updatedAt
+          })
+          setShowResumeModal(true)
+        } else {
+          // No resumable session, ready to start new one when play is clicked
+          setSessionReady(true)
+        }
+      } else {
+        // Error checking session, allow new session
+        setSessionReady(true)
+      }
+    } catch (error) {
+      console.error('Error checking for existing session:', error)
+      setSessionReady(true)
+    }
+  }
+  
+  // Start or resume viewing session
+  const startViewingSession = async (forceNewSession = false) => {
+    if (!user || !video) return
+    
+    console.log('🎬 Starting viewing session for video:', video.id, 'user:', user.id)
+    
+    try {
+      const response = await fetch(`/api/videos/${video.id}/view/start`, {
+        method: 'POST',
+        credentials: 'include', // Use cookies for auth
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ forceNew: forceNewSession })
+      })
+      
+      console.log('🎬 Start session response:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('🎬 Session started:', data)
+        
+        // Just set the session ID - modal check was already done on page load
+        setViewId(data.viewId)
+        if (!forceNewSession && data.watchTimeSeconds > 0) {
+          // Resume with existing watch time
+          setWatchedTime(data.watchTimeSeconds)
+          setLastSavedTime(data.watchTimeSeconds)
+        }
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to start session:', response.status, errorText)
+      }
+    } catch (error) {
+      console.error('Error starting viewing session:', error)
+    }
+  }
+  
+  // Update viewing progress
+  const updateViewProgress = async (forceComplete: boolean = false) => {
+    if (!viewId || !user || !video) return
+    
+    console.log('📊 Updating progress - viewId:', viewId, 'watched:', watchedTime, 'position:', videoPosition)
+    
+    try {
+      // Check if video should be marked as complete
+      let isComplete = forceComplete
+      if (videoDuration > 0) {
+        const percentageWatched = (videoPosition / videoDuration) * 100
+        
+        if (videoDuration > 300) { // More than 5 minutes
+          isComplete = isComplete || percentageWatched >= 90
+        } else { // 5 minutes or less
+          isComplete = isComplete || percentageWatched >= 80
+        }
+      }
+      
+      // Cap watch time and playhead to not exceed video duration
+      const videoDurationSeconds = video.durationSeconds || videoDuration || 0
+      const cappedWatchTime = Math.min(Math.round(watchedTime), videoDurationSeconds)
+      const cappedPlayhead = Math.min(videoPosition, videoDurationSeconds)
+      
+      if (watchedTime > videoDurationSeconds && videoDurationSeconds > 0) {
+        console.warn(`Watch time (${watchedTime}s) exceeds video duration (${videoDurationSeconds}s). Capping to duration.`)
+      }
+      
+      const updateData = {
+        viewId,
+        watchTimeSeconds: cappedWatchTime,
+        playheadPosition: cappedPlayhead,
+        isComplete
+      }
+      
+      console.log('📊 Sending update:', updateData)
+      
+      const response = await fetch(`/api/videos/${video.id}/view/update`, {
+        method: 'POST',
+        credentials: 'include', // Use cookies for auth
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      })
+      
+      console.log('📊 Update response:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('📊 Update successful:', data)
+        if (data.isComplete) {
+          console.log('✅ Video marked as complete')
+          // Reset viewing session if complete
+          setViewId(null)
+        }
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update progress:', response.status, errorText)
+      }
+    } catch (error) {
+      console.error('Error updating view progress:', error)
+    }
+  }
+  
+  // Handle resume modal actions
+  const handleResumeVideo = async () => {
+    if (!resumeData) return
+    
+    console.log('📺 User chose to resume from position:', resumeData.playheadPosition, 'with watch time:', resumeData.watchTimeSeconds)
+    
+    // Reopen the existing session
+    try {
+      const response = await fetch(`/api/videos/${video.id}/view/resume`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ viewId: resumeData.viewId })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('📺 Session resumed:', data)
+        
+        setViewId(data.viewId)
+        setShouldResume(true)
+        setResumePosition(data.playheadPosition)
+        console.log('📺 Setting watched time to:', data.watchTimeSeconds)
+        setWatchedTime(data.watchTimeSeconds) // Continue watch time from saved position
+        setLastSavedTime(data.watchTimeSeconds)
+        // Force reset to false after setting watch time
+        setResetWatch(false)
+        setShowResumeModal(false)
+        setResumeData(null)
+        setIsTabSwitchResume(false)
+        setSessionReady(true) // Ready to continue tracking
+        
+        // Auto-play the video after resuming
+        setTimeout(() => {
+          console.log('▶️ Auto-playing video after resume')
+          
+          // For Vimeo player
+          const iframe = document.querySelector('iframe[src*="vimeo"]') as HTMLIFrameElement
+          if (iframe && iframe.contentWindow) {
+            // First seek to position, then play
+            iframe.contentWindow.postMessage(
+              JSON.stringify({ method: 'setCurrentTime', value: data.playheadPosition }),
+              '*'
+            )
+            setTimeout(() => {
+              iframe.contentWindow.postMessage(
+                JSON.stringify({ method: 'play' }),
+                '*'
+              )
+            }, 500)
+          }
+          
+          // For HTML5 video
+          if (videoRef.current) {
+            videoRef.current.currentTime = data.playheadPosition
+            videoRef.current.play()
+          }
+          
+          // Start the timer
+          setIsTimerPlaying(true)
+        }, 500)
+      }
+    } catch (error) {
+      console.error('Error resuming session:', error)
+      // Fallback: use local data
+      setViewId(resumeData.viewId)
+      setShouldResume(true)
+      setResumePosition(resumeData.playheadPosition)
+      setWatchedTime(resumeData.watchTimeSeconds)
+      setLastSavedTime(resumeData.watchTimeSeconds)
+      setShowResumeModal(false)
+      setResumeData(null)
+      setIsTabSwitchResume(false)
+      setSessionReady(true)
+      
+      // Auto-play even in fallback
+      setTimeout(() => {
+        console.log('▶️ Auto-playing video after resume (fallback)')
+        
+        const iframe = document.querySelector('iframe[src*="vimeo"]') as HTMLIFrameElement
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage(
+            JSON.stringify({ method: 'setCurrentTime', value: resumeData.playheadPosition }),
+            '*'
+          )
+          setTimeout(() => {
+            iframe.contentWindow.postMessage(
+              JSON.stringify({ method: 'play' }),
+              '*'
+            )
+          }, 500)
+        }
+        
+        if (videoRef.current) {
+          videoRef.current.currentTime = resumeData.playheadPosition
+          videoRef.current.play()
+        }
+        
+        setIsTimerPlaying(true)
+      }, 500)
+    }
+  }
+  
+  const handleStartOver = async () => {
+    console.log('🔄 User chose to start from beginning')
+    setShowResumeModal(false)
+    setResumeData(null)
+    setIsTabSwitchResume(false)
+    // Create a new session
+    const response = await startViewingSession(true)
+    setSessionReady(true) // Ready to start tracking
+    
+    // Auto-play the video from the beginning
+    setTimeout(() => {
+      console.log('▶️ Auto-playing video from beginning')
+      
+      // For Vimeo iframe
+      const iframe = document.querySelector('iframe[src*="vimeo"]') as HTMLIFrameElement
+      if (iframe && iframe.contentWindow) {
+        // First set to beginning
+        iframe.contentWindow.postMessage(
+          JSON.stringify({ method: 'setCurrentTime', value: 0 }),
+          '*'
+        )
+        // Then play
+        setTimeout(() => {
+          iframe.contentWindow.postMessage(
+            JSON.stringify({ method: 'play' }),
+            '*'
+          )
+        }, 500)
+      }
+      
+      // For HTML5 video
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0
+        videoRef.current.play()
+      }
+      
+      // Start the timer
+      setIsTimerPlaying(true)
+    }, 500)
+  }
 
 
   const fetchVideo = async () => {
+    console.log('📹 Fetching video:', params.id)
     try {
       setLoading(true)
       const response = await fetch(`/api/videos/${params.id}`)
@@ -151,6 +736,16 @@ export default function VideoPage() {
       }
       
       const data = await response.json()
+      console.log('📺 VIDEO DATA:', {
+        id: data.id,
+        hasIframe: !!data.iframe,
+        iframeContent: data.iframe ? data.iframe.substring(0, 100) + '...' : null,
+        hasPlaybackUrl: !!data.playbackUrl,
+        playbackUrl: data.playbackUrl,
+        isFree: data.isFree,
+        openForSubscribers: data.openForSubscribers
+      })
+      console.log('📺 Setting video state with data:', data)
       setVideo(data)
     } catch (err: any) {
       setError(err.message || 'Video laadimine ebaõnnestus')
@@ -287,6 +882,20 @@ export default function VideoPage() {
 
   return (
     <div className="min-h-screen bg-[#2c313a] text-white">
+      {/* Resume Modal */}
+      <ResumeModal
+        isOpen={showResumeModal}
+        onClose={() => {
+          setShowResumeModal(false)
+          setIsTabSwitchResume(false)
+        }}
+        onResume={handleResumeVideo}
+        onStartOver={handleStartOver}
+        playheadPosition={resumeData?.playheadPosition || 0}
+        lastWatchedDate={resumeData?.updatedAt}
+        isTabSwitch={isTabSwitchResume}
+      />
+      
       <div className="max-w-[1400px] mx-auto">
         <div className="flex flex-col lg:flex-row gap-6 p-6">
           {/* Main Content */}
@@ -331,15 +940,7 @@ export default function VideoPage() {
                 // Video content - keep structure stable regardless of overlay state
                 <div className="w-full h-full relative">
                   {video.iframe ? (
-                    <div 
-                      ref={iframeRef}
-                      className="w-full h-full"
-                      dangerouslySetInnerHTML={{ 
-                        __html: video.iframe
-                          .replace(/width="\d+"/, 'width="100%"')
-                          .replace(/height="\d+"/, 'height="100%"')
-                      }}
-                    />
+                    <VimeoIframe iframeHtml={video.iframe} videoId={video.id} />
                   ) : video.playbackUrl ? (
                     <video
                       ref={videoRef}
@@ -347,13 +948,29 @@ export default function VideoPage() {
                       controls
                       poster={video.thumbnail}
                       onPlay={() => {
+                        console.log('🎥 HTML5 VIDEO: Play event triggered')
                         setIsPlaying(true)
+                        setIsTimerPlaying(true) // Start timer
                       }}
                       onPause={() => {
+                        console.log('🎥 HTML5 VIDEO: Pause event triggered')
                         setIsPlaying(false)
+                        setIsTimerPlaying(false) // Stop timer
                       }}
                       onEnded={() => {
+                        console.log('🎥 HTML5 VIDEO: Ended event triggered')
                         setIsPlaying(false)
+                        setIsTimerPlaying(false) // Stop timer
+                      }}
+                      onLoadedMetadata={() => {
+                        console.log('🎥 HTML5 VIDEO: Metadata loaded')
+                      }}
+                      onTimeUpdate={(e) => {
+                        // Log only once per second to avoid spam
+                        const currentTime = Math.floor(e.currentTarget.currentTime)
+                        if (currentTime % 5 === 0 && currentTime > 0) {
+                          console.log('🎥 HTML5 VIDEO: Time update', currentTime)
+                        }
                       }}
                     >
                       <source src={video.playbackUrl} type="video/mp4" />
@@ -377,6 +994,19 @@ export default function VideoPage() {
 
             </div>
 
+            {/* Watch Time Display for Mobile - Above video title */}
+            <div className="lg:hidden">
+              <WatchTimeDisplay 
+                key={`timer-${viewId}-${watchedTime}`}
+                isPlaying={isTimerPlaying}
+                onTimeUpdate={handleWatchTimeUpdate}
+                onReset={resetWatch}
+                currentVideoTime={videoPosition}
+                videoDuration={videoDuration}
+                initialWatchTime={watchedTime}
+              />
+            </div>
+            
             {/* Video Title and Actions */}
             <div className="mb-6">
               <div className="flex items-start justify-between mb-4">
@@ -545,6 +1175,22 @@ export default function VideoPage() {
 
           {/* Sidebar */}
           <div className="lg:w-80">
+            {/* Resume notification */}
+            {shouldResume && resumePosition > 0 && (
+              <div className="bg-blue-600 rounded-lg p-4 mb-4">
+                <p className="text-white text-sm">
+                  📺 Video jätkub kohalt {Math.floor(resumePosition / 60)}:{Math.floor(resumePosition % 60).toString().padStart(2, '0')}
+                </p>
+                <button
+                  onClick={() => setShouldResume(false)}
+                  className="text-white/80 text-xs hover:text-white mt-1"
+                >
+                  Sulge teade
+                </button>
+              </div>
+            )}
+            
+            
             {/* Training Details */}
             <div className="bg-[#3e4551] rounded-lg p-6 mb-6">
               <h3 className="text-lg font-bold mb-4">Treeningu info</h3>
