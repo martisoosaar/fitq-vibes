@@ -111,7 +111,6 @@ export function useVideoTracking({ videoId, duration, onTimeUpdate }: VideoTrack
     const handleVisibilityChange = () => {
       if (document.hidden && isPlayingRef.current) {
         // Tab became hidden, pause tracking
-        console.log('🔄 Tab hidden - pausing video tracking')
         isPlayingRef.current = false
         
         // Clear interval to stop tracking
@@ -133,19 +132,16 @@ export function useVideoTracking({ videoId, duration, onTimeUpdate }: VideoTrack
         }
       } else if (!document.hidden && !isPlayingRef.current) {
         // Tab became visible again - but don't auto-resume tracking
-        console.log('🔄 Tab visible - tracking ready to resume on play')
       }
     }
 
     const handleWindowBlur = () => {
       if (isPlayingRef.current) {
-        console.log('🔄 Window lost focus - pausing video tracking')
         handleVisibilityChange()
       }
     }
 
     const handleWindowFocus = () => {
-      console.log('🔄 Window gained focus - tracking ready')
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)

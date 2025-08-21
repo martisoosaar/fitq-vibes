@@ -31,9 +31,7 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
   }, [options?.onPlay, options?.onPause, options?.onTimeUpdate, options?.onEnded])
 
   useEffect(() => {
-    console.log('🎬 Vimeo Player hook effect triggered, enabled:', options?.enabled)
     if (!options?.enabled) {
-      console.log('🎬 Vimeo Player hook not enabled, skipping')
       return
     }
 
@@ -46,9 +44,7 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
       attempts++
       // Search for iframe directly in DOM like the old Vue code
       const iframe = document.querySelector('iframe[src*="vimeo.com"]') as HTMLIFrameElement
-      console.log(`🎬 Attempt ${attempts} - Looking for Vimeo iframe in DOM:`, !!iframe)
       if (iframe) {
-        console.log('🎬 Found Vimeo iframe:', iframe.src)
       }
       
       if (!iframe && attempts < maxAttempts) {
@@ -58,18 +54,15 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
       }
       
       if (!iframe) {
-        console.log('🎬 No Vimeo iframe found after', maxAttempts, 'attempts')
         return
       }
 
       // Check if player already exists
       if (playerRef.current) {
-        console.log('🎬 Vimeo player already exists, skipping init')
         return
       }
 
       try {
-        console.log('🎬 Initializing Vimeo Player with iframe:', iframe)
         const player = new Player(iframe)
         playerRef.current = player
 
@@ -80,23 +73,19 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
 
         // Set up event listeners
         player.on('play', () => {
-          console.log('🎬 Vimeo: Video started playing')
           setIsPlaying(true)
           onPlayRef.current?.()
         })
 
         player.on('pause', () => {
-          console.log('🎬 Vimeo: Video paused')
           setIsPlaying(false)
           onPauseRef.current?.()
         })
 
         player.on('loaded', () => {
-          console.log('🎬 Vimeo: Video loaded')
         })
 
         player.on('ready', () => {
-          console.log('🎬 Vimeo: Player ready')
         })
 
         player.on('timeupdate', (data) => {
@@ -105,17 +94,15 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
         })
 
         player.on('ended', () => {
-          console.log('🎬 Vimeo: Video ended')
           setIsPlaying(false)
           onEndedRef.current?.()
         })
 
         player.ready().then(() => {
-          console.log('🎬 Vimeo Player ready')
           setIsReady(true)
         })
       } catch (error) {
-        console.error('🎬 Failed to initialize Vimeo player:', error)
+        // console.error('🎬 Failed to initialize Vimeo player:', error)
       }
     }
     
@@ -149,15 +136,13 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
 
   const getPaused = async (): Promise<boolean> => {
     if (!playerRef.current) {
-      console.log('🎬 Vimeo: No player available for getPaused')
       return true
     }
     try {
       const isPaused = await playerRef.current.getPaused()
-      console.log('🎬 Vimeo: getPaused result:', isPaused)
       return isPaused
     } catch (error) {
-      console.error('🎬 Vimeo: Failed to get paused state:', error)
+      // console.error('🎬 Vimeo: Failed to get paused state:', error)
       return true
     }
   }
@@ -166,9 +151,8 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
     if (!playerRef.current) return
     try {
       await playerRef.current.setCurrentTime(seconds)
-      console.log('🎬 Vimeo: Set time to', seconds)
     } catch (error) {
-      console.error('🎬 Vimeo: Failed to set time:', error)
+      // console.error('🎬 Vimeo: Failed to set time:', error)
     }
   }
 
@@ -178,24 +162,21 @@ export function useVimeoPlayer(options?: UseVimeoPlayerOptions) {
       await playerRef.current.play()
       setIsPlaying(true)
     } catch (error) {
-      console.error('🎬 Vimeo: Failed to play:', error)
+      // console.error('🎬 Vimeo: Failed to play:', error)
     }
   }
 
   const pause = async () => {
     if (!playerRef.current) {
-      console.log('🎬 Vimeo: No player available for pause')
       return
     }
     try {
-      console.log('🎬 Vimeo: Attempting to pause video')
       await playerRef.current.pause()
       // Double-check if video is actually paused
       const isPaused = await playerRef.current.getPaused()
       setIsPlaying(!isPaused)
-      console.log('🎬 Vimeo: Pause result - isPaused:', isPaused)
     } catch (error) {
-      console.error('🎬 Vimeo: Failed to pause:', error)
+      // console.error('🎬 Vimeo: Failed to pause:', error)
       setIsPlaying(false)
     }
   }

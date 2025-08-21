@@ -344,9 +344,7 @@ export default function VideosPage() {
                         src={video.thumbnail} 
                         alt={video.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onLoad={() => console.log('Image loaded:', video.thumbnail)}
                         onError={(e) => {
-                          console.log('Image failed to load:', video.thumbnail)
                           const target = e.target as HTMLImageElement
                           target.onerror = null
                           target.src = '/images/video-placeholder.png'

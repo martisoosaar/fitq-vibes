@@ -8,30 +8,25 @@ export default function ImpersonationBanner() {
   const [adminId, setAdminId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check if we're impersonating
-    const checkImpersonation = () => {
-      const cookies = document.cookie.split(';')
-      let impersonating = false
-      let admin = null
-      
-      for (const cookie of cookies) {
-        const [name, value] = cookie.trim().split('=')
-        if (name === 'fitq_impersonating' && value === 'true') {
-          impersonating = true
-        } else if (name === 'fitq_admin_id') {
-          admin = value
-        }
-      }
-      
-      setIsImpersonating(impersonating)
-      setAdminId(admin)
-    }
-
-    checkImpersonation()
+    // Check if we're impersonating - only once on mount
+    const cookies = document.cookie.split(';')
+    let impersonating = false
+    let admin = null
     
-    // Check periodically in case cookies change
-    const interval = setInterval(checkImpersonation, 5000)
-    return () => clearInterval(interval)
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=')
+      if (name === 'fitq_impersonating' && value === 'true') {
+        impersonating = true
+      } else if (name === 'fitq_admin_id') {
+        admin = value
+      }
+    }
+    
+    setIsImpersonating(impersonating)
+    setAdminId(admin)
+    
+    // No need for periodic checking - impersonation state won't change
+    // unless user explicitly stops it or navigates away
   }, [])
 
   const handleStopImpersonation = () => {

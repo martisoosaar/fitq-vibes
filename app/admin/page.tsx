@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, UserCheck, Search, Edit, Trash2, Shield, Mail, Calendar, Activity, PlayCircle, Eye, EyeOff, Lock, Unlock, Trophy, BookOpen, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Users, UserCheck, Search, Edit, Trash2, Shield, Mail, Calendar, Activity, PlayCircle, Eye, EyeOff, Lock, Unlock, Trophy, BookOpen, RotateCcw, BarChart } from 'lucide-react'
+import VideoViewsTable from '@/components/Admin/VideoViewsTable'
 
 interface User {
   id: number
@@ -90,7 +91,7 @@ interface Program {
 
 export default function AdminPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'users' | 'trainers' | 'videos' | 'challenges' | 'programs'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'trainers' | 'videos' | 'challenges' | 'programs' | 'video-views'>('users')
   const [users, setUsers] = useState<User[]>([])
   const [trainers, setTrainers] = useState<Trainer[]>([])
   const [videos, setVideos] = useState<Video[]>([])
@@ -521,9 +522,21 @@ export default function AdminPage() {
             <BookOpen className="w-5 h-5 inline mr-2" />
             Programmid
           </button>
+          <button
+            onClick={() => setActiveTab('video-views')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'video-views'
+                ? 'bg-[#40b236] text-white'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            <Eye className="w-5 h-5 inline mr-2" />
+            Vaatamised
+          </button>
         </div>
 
         {/* Search */}
+        {activeTab !== 'video-views' && (
         <div className="bg-[#3e4551] rounded-lg p-4 mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -534,7 +547,8 @@ export default function AdminPage() {
                 activeTab === 'trainers' ? 'Otsi treenereid...' :
                 activeTab === 'videos' ? 'Otsi videoid...' :
                 activeTab === 'challenges' ? 'Otsi väljakutseid...' :
-                'Otsi programme...'
+                activeTab === 'programs' ? 'Otsi programme...' :
+                'Otsi vaatamisi...'
               }
               value={searchTerm}
               onChange={(e) => {
@@ -567,6 +581,7 @@ export default function AdminPage() {
             />
           </div>
         </div>
+        )}
 
         {/* Content */}
         {loading ? (
@@ -1051,6 +1066,11 @@ export default function AdminPage() {
                 </div>
               </div>
             ) : null}
+            
+            {/* Video Views Tab */}
+            {activeTab === 'video-views' && (
+              <VideoViewsTable />
+            )}
           </>
         )}
       </div>

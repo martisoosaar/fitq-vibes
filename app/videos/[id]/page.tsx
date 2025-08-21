@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useVimeoPlayer } from '../../../hooks/useVimeoPlayer'
+import { useState, useEffect, useRef, useMemo, memo } from 'react'
+// import { useVimeoPlayer } from '../../../hooks/useVimeoPlayer'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Heart, Eye, Clock, Dumbbell, Volume2, Info, Share2, ChevronLeft, Lock } from 'lucide-react'
-import { useVideoTracking } from '../../../hooks/useVideoTracking'
+// Removed video tracking import
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface Video {
@@ -92,16 +92,6 @@ function formatDuration(seconds: number): string {
   return `${m}min ${s}s`
 }
 
-function formatTimePosition(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
-  
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
@@ -118,7 +108,6 @@ function formatDate(dateString: string): string {
 }
 
 export default function VideoPage() {
-  console.log('🎬 VideoPage component rendered')
   const params = useParams()
   const router = useRouter()
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -128,239 +117,33 @@ export default function VideoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Video tracking
-  const videoTracking = useVideoTracking({
-    videoId: parseInt(params.id as string),
-    duration: video?.durationSeconds,
-    onTimeUpdate: (currentTime, watchedTime) => {
-      // Optional: could show progress or other UI updates
-    }
-  })
+  // Removed all video tracking code
+  
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isTabHidden, setIsTabHidden] = useState(false)
   const [showMusicList, setShowMusicList] = useState(false)
-  const [pausedPosition, setPausedPosition] = useState<number>(0)
   const iframeRef = useRef<HTMLDivElement>(null)
-  const [vimeoTime, setVimeoTime] = useState<number>(0)
   
-  // Use Vimeo Player API for iframe videos
-  console.log('🎬 Setting up Vimeo Player hook, video?.iframe:', !!video?.iframe)
-  const vimeoPlayer = useVimeoPlayer({
-    enabled: !!video?.iframe,
-    onPlay: () => {
-      console.log('🎬 Vimeo play detected')
-      setIsPlaying(true)
-      videoTracking.handlePlay()
-    },
-    onPause: () => {
-      console.log('🎬 Vimeo pause detected')
-      setIsPlaying(false)
-      videoTracking.handlePause()
-    },
-    onTimeUpdate: (seconds) => {
-      console.log('🎬 Vimeo timeupdate:', seconds)
-      setVimeoTime(seconds)
-    },
-    onEnded: () => {
-      console.log('🎬 Vimeo video ended')
-      setIsPlaying(false)
-      videoTracking.handleEnded()
-    }
-  })
+  // Removed Vimeo Player hook to simplify
 
-  // Sync isPlaying state with Vimeo player state
-  useEffect(() => {
-    if (video?.iframe && vimeoPlayer.isReady) {
-      setIsPlaying(vimeoPlayer.isPlaying)
-    }
-  }, [vimeoPlayer.isPlaying, vimeoPlayer.isReady, video?.iframe])
   
-  // Debug log for isTabHidden changes
-  useEffect(() => {
-    console.log('🎬 isTabHidden changed to:', isTabHidden)
-  }, [isTabHidden])
-
-  // Debug log for isPlaying changes
-  useEffect(() => {
-    console.log('🎬 isPlaying changed to:', isPlaying)
-  }, [isPlaying])
 
   useEffect(() => {
-    console.log('🎬 VideoPage useEffect triggered, params.id:', params.id)
     fetchVideo()
     fetchComments()
-    // Reset tab hidden state on page load
-    setIsTabHidden(false)
   }, [params.id])
 
-  // Start tracking for iframe videos automatically (only on initial load)
-  useEffect(() => {
-    if (video?.iframe && !isTabHidden && !pausedPosition) {
-      console.log('🎬 Starting automatic tracking for iframe video on initial load')
-      // For iframe videos, assume they start playing automatically
-      setIsPlaying(true)
-      videoTracking.handlePlay()
-      
-      // Also check Vimeo player state after a delay
-      setTimeout(async () => {
-        if (vimeoPlayer.isReady) {
-          try {
-            const isPaused = await vimeoPlayer.getPaused()
-            console.log('🎬 Initial Vimeo paused state check:', isPaused)
-            setIsPlaying(!isPaused)
-          } catch (e) {
-            console.log('🎬 Could not check initial Vimeo state')
-          }
-        }
-      }, 2000)
-    }
-  }, [video?.iframe]) // Remove isTabHidden from dependencies to prevent re-triggering
+  // Removed auto-play tracking for iframe videos
 
-  // Store vimeoTime in a ref to avoid dependency issues
-  const vimeoTimeRef = useRef(vimeoTime)
-  useEffect(() => {
-    vimeoTimeRef.current = vimeoTime
-  }, [vimeoTime])
-  
-  // Store vimeoPlayer.isReady in a ref to avoid dependency issues
-  const vimeoPlayerReadyRef = useRef(vimeoPlayer.isReady)
-  useEffect(() => {
-    vimeoPlayerReadyRef.current = vimeoPlayer.isReady
-  }, [vimeoPlayer.isReady])
+  // Removed vimeoTime and vimeoPlayer refs
 
-  // Handle page visibility changes for video element
-  useEffect(() => {
-    console.log('🎬 Setting up visibility change listeners, video?.iframe:', !!video?.iframe, 'vimeoPlayer.isReady:', vimeoPlayerReadyRef.current)
-    
-    const handleVisibilityChange = async () => {
-      console.log('🎬 Visibility change detected, document.hidden:', document.hidden, 'isPlaying:', isPlaying)
-      
-      if (document.hidden) {
-        console.log('🎬 Tab hidden - checking if we need to pause video, isPlaying:', isPlaying)
-        
-        // Get actual position based on video type
-        let currentPosition = 0
-        
-        if (videoRef.current && !videoRef.current.paused) {
-          // HTML5 video - use native currentTime
-          currentPosition = videoRef.current.currentTime
-          console.log('🎬 HTML5 video - saving position:', currentPosition)
-          videoRef.current.pause()
-        } else if (video?.iframe) {
-          // Vimeo iframe - try to get position from player API or use state
-          console.log('🎬 Vimeo player state - isReady:', vimeoPlayerReadyRef.current, 'vimeoTimeRef:', vimeoTimeRef.current)
-          
-          // Always try to pause if we have a Vimeo player
-          if (vimeoPlayerReadyRef.current) {
-            try {
-              // Get current position first
-              currentPosition = await vimeoPlayer.getCurrentTime()
-              console.log('🎬 Vimeo video - actual position from API:', currentPosition)
-              
-              // Check if video is actually playing
-              const isPaused = await vimeoPlayer.getPaused()
-              console.log('🎬 Vimeo player isPaused before pause:', isPaused)
-              
-              // Always try to pause, even if already paused
-              await vimeoPlayer.pause()
-              console.log('🎬 Vimeo pause command sent')
-              
-              // Verify pause worked
-              const isPausedAfter = await vimeoPlayer.getPaused()
-              console.log('🎬 Vimeo player isPaused after pause:', isPausedAfter)
-              
-              // Set playing state based on actual status
-              setIsPlaying(false)
-            } catch (error) {
-              console.error('🎬 Failed to pause Vimeo:', error)
-              // Use current time from ref if API fails
-              currentPosition = vimeoTimeRef.current
-              console.log('🎬 Using vimeoTime from ref after error:', currentPosition)
-            }
-          } else {
-            // Player not ready, use time from state
-            currentPosition = vimeoTimeRef.current
-            console.log('🎬 Vimeo player not ready, using vimeoTime from ref:', currentPosition)
-            // Still try to set playing to false
-            setIsPlaying(false)
-          }
-        } else {
-          // Final fallback
-          currentPosition = videoTracking.getWatchedTime()
-          console.log('🎬 Final fallback - using tracking time:', currentPosition)
-        }
-        
-        setPausedPosition(currentPosition)
-        
-        // Pause tracking
-        videoTracking.handlePause()
-        setIsPlaying(false)
-        setIsTabHidden(true)
-        console.log('🎬 Set isTabHidden to true, paused at:', currentPosition)
-      } else {
-        // Tab became visible again
-        console.log('🎬 Tab visible')
-        setIsTabHidden(prevHidden => {
-          if (prevHidden) {
-            console.log('🎬 Was hidden, now showing overlay for resume')
-            // Keep overlay visible until user clicks resume
-            return true
-          }
-          return prevHidden
-        })
-      }
-    }
+  // Removed all tab visibility tracking
 
-    // Add window blur/focus listeners for better cross-browser support
-    const handleWindowBlur = () => {
-      if (!document.hidden) {
-        console.log('🎬 Window lost focus - triggering visibility change')
-        handleVisibilityChange()
-      }
-    }
-
-    const handleWindowFocus = () => {
-      console.log('🎬 Window gained focus')
-    }
-
-    // Add page hide/show listeners for better mobile support
-    const handlePageHide = () => {
-      console.log('🎬 Page hide - pausing video')
-      handleVisibilityChange()
-    }
-
-    const handlePageShow = () => {
-      console.log('🎬 Page show')
-    }
-
-    console.log('🎬 Adding event listeners for tab switching')
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('blur', handleWindowBlur)
-    window.addEventListener('focus', handleWindowFocus)
-    window.addEventListener('pagehide', handlePageHide)
-    window.addEventListener('pageshow', handlePageShow)
-    console.log('🎬 Event listeners added successfully')
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('blur', handleWindowBlur)
-      window.removeEventListener('focus', handleWindowFocus)
-      window.removeEventListener('pagehide', handlePageHide)
-      window.removeEventListener('pageshow', handlePageShow)
-    }
-  }, [videoTracking.handlePause, videoTracking.getWatchedTime, video?.iframe])
-
-  // Debug effect to log state changes
-  useEffect(() => {
-    console.log('🎬 State changed - video:', !!video, 'iframe:', !!video?.iframe, 'vimeoReady:', vimeoPlayer.isReady, 'isPlaying:', isPlaying, 'isTabHidden:', isTabHidden)
-  }, [video, video?.iframe, vimeoPlayer.isReady, isPlaying, isTabHidden])
 
   const fetchVideo = async () => {
     try {
       setLoading(true)
-      console.log('🎬 Fetching video data for ID:', params.id)
       const response = await fetch(`/api/videos/${params.id}`)
       
       if (!response.ok) {
@@ -368,17 +151,8 @@ export default function VideoPage() {
       }
       
       const data = await response.json()
-      console.log('🎬 Video data loaded:', {
-        id: data.id,
-        title: data.title,
-        iframe: !!data.iframe,
-        vimeoId: data.vimeoId,
-        isFree: data.isFree,
-        isPremium: data.isPremium
-      })
       setVideo(data)
     } catch (err: any) {
-      console.error('🎬 Failed to fetch video:', err)
       setError(err.message || 'Video laadimine ebaõnnestus')
     } finally {
       setLoading(false)
@@ -412,17 +186,19 @@ export default function VideoPage() {
 
   const handleLike = async () => {
     // TODO: Implement like functionality
-    console.log('Like clicked')
   }
 
   const handleFavorite = async () => {
     // TODO: Implement favorite functionality
-    console.log('Favorite clicked')
   }
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newComment.trim() || !user) return
+    if (!newComment.trim()) return
+    if (!user) {
+      alert('Kommenteerimiseks pead olema sisse logitud')
+      return
+    }
     
     try {
       const token = localStorage.getItem('accessToken')
@@ -562,8 +338,6 @@ export default function VideoPage() {
                         __html: video.iframe
                           .replace(/width="\d+"/, 'width="100%"')
                           .replace(/height="\d+"/, 'height="100%"')
-                          .replace(/autopause=0/, 'autopause=1&amp;autoplay=0')
-                          .replace(/allow="([^"]*)"/, 'allow="$1; autopause"')
                       }}
                     />
                   ) : video.playbackUrl ? (
@@ -574,21 +348,12 @@ export default function VideoPage() {
                       poster={video.thumbnail}
                       onPlay={() => {
                         setIsPlaying(true)
-                        setIsTabHidden(false)
-                        videoTracking.handlePlay()
                       }}
                       onPause={() => {
                         setIsPlaying(false)
-                        videoTracking.handlePause()
                       }}
                       onEnded={() => {
                         setIsPlaying(false)
-                        videoTracking.handleEnded()
-                      }}
-                      onSeeking={videoTracking.handleSeeking}
-                      onTimeUpdate={(e) => {
-                        const currentTime = (e.target as HTMLVideoElement).currentTime
-                        videoTracking.handleTimeUpdate(currentTime)
                       }}
                     >
                       <source src={video.playbackUrl} type="video/mp4" />
@@ -606,249 +371,7 @@ export default function VideoPage() {
                     </div>
                   )}
 
-                  {/* Tab Hidden Overlay - always present but conditionally visible */}
-                  <div 
-                    className={`absolute inset-0 bg-[#3e4551] bg-opacity-95 rounded-lg flex items-center justify-center transition-opacity duration-300 z-50 ${
-                      isTabHidden ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className="text-6xl mb-4">⏸️</div>
-                      <p className="text-xl mb-2">Video peatati tab-ist lahkumisel</p>
-                      <p className="text-lg mb-4 text-gray-300">
-                        Peatatud kohal: <span className="font-bold text-[#40b236]">{formatTimePosition(pausedPosition)}</span>
-                      </p>
-                      <button
-                        onClick={async () => {
-                          console.log('🎬 Resume video button clicked')
-                          console.log('🎬 Resuming from position:', pausedPosition)
-                          console.log('🎬 Video iframe exists:', !!video?.iframe)
-                          console.log('🎬 Vimeo player ready:', vimeoPlayer.isReady)
-                          
-                          // First hide the overlay
-                          setIsTabHidden(false)
-                          
-                          if (video?.iframe && vimeoPlayer.isReady) {
-                            // Use Vimeo Player API to set position and resume
-                            console.log('🎬 Using Vimeo Player API to resume at:', pausedPosition)
-                            
-                            if (pausedPosition > 0) {
-                              // Set the video time using Vimeo API
-                              await vimeoPlayer.setVideoTime(pausedPosition)
-                              console.log('🎬 Set Vimeo video time to:', pausedPosition)
-                            }
-                            
-                            // Play the video
-                            await vimeoPlayer.play()
-                            setIsPlaying(true)
-                            videoTracking.handlePlay()
-                            console.log('🎬 Vimeo video resumed via API')
-                            
-                          } else if (videoRef.current) {
-                            // HTML5 video logic
-                            setTimeout(() => {
-                              if (videoRef.current && pausedPosition > 0) {
-                                console.log('🎬 Setting HTML5 video currentTime to:', pausedPosition)
-                                videoRef.current.currentTime = pausedPosition
-                                
-                                setTimeout(() => {
-                                  if (videoRef.current) {
-                                    console.log('🎬 Attempting to resume HTML5 playback')
-                                    videoRef.current.play()
-                                      .then(() => {
-                                        console.log('🎬 HTML5 video resumed successfully')
-                                        setIsPlaying(true)
-                                        videoTracking.handlePlay()
-                                      })
-                                      .catch((error) => {
-                                        console.log('🎬 Auto-play failed, user interaction required:', error)
-                                      })
-                                  }
-                                }, 100)
-                              } else if (videoRef.current) {
-                                // Play from beginning if no saved position
-                                console.log('🎬 Playing HTML5 video from beginning')
-                                videoRef.current.play()
-                                  .then(() => {
-                                    console.log('🎬 HTML5 video started successfully')
-                                    setIsPlaying(true)
-                                    videoTracking.handlePlay()
-                                  })
-                                  .catch((error) => {
-                                    console.log('🎬 Auto-play failed, user interaction required:', error)
-                                  })
-                              }
-                            }, 50)
-                          } else {
-                            console.log('🎬 No video element found to resume')
-                          }
-                        }}
-                        className="px-6 py-3 bg-[#40b236] hover:bg-[#60cc56] text-white font-semibold rounded-lg transition-colors"
-                      >
-                        Jätka vaatamist
-                      </button>
-                      
-                      {/* Test button for debugging */}
-                      <button
-                        onClick={() => {
-                          console.log('🎬 Test button clicked - simulating tab switch')
-                          document.dispatchEvent(new Event('visibilitychange'))
-                        }}
-                        className="mt-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Test Tab Switch
-                      </button>
-                      
-                      {/* Test button for manual pause */}
-                      <button
-                        onClick={async () => {
-                          console.log('🎬 Manual pause button clicked')
-                          if (video?.iframe && vimeoPlayer.isReady) {
-                            try {
-                              console.log('🎬 Attempting manual pause via Vimeo API')
-                              await vimeoPlayer.pause()
-                              console.log('🎬 Manual pause successful')
-                            } catch (error) {
-                              console.error('🎬 Manual pause failed:', error)
-                            }
-                          } else {
-                            console.log('🎬 Cannot pause - iframe:', !!video?.iframe, 'player ready:', vimeoPlayer.isReady)
-                          }
-                        }}
-                        className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Manual Pause
-                      </button>
-                      
-                      {/* Test button for checking player state */}
-                      <button
-                        onClick={async () => {
-                          console.log('🎬 Check player state button clicked')
-                          console.log('🎬 Video iframe exists:', !!video?.iframe)
-                          console.log('🎬 Vimeo player ready:', vimeoPlayer.isReady)
-                          console.log('🎬 Vimeo player isPlaying:', vimeoPlayer.isPlaying)
-                          console.log('🎬 Local isPlaying state:', isPlaying)
-                          
-                          if (video?.iframe && vimeoPlayer.isReady) {
-                            try {
-                              const isPaused = await vimeoPlayer.getPaused()
-                              console.log('🎬 Vimeo player isPaused:', isPaused)
-                            } catch (error) {
-                              console.error('🎬 Failed to get paused state:', error)
-                            }
-                          }
-                        }}
-                        className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Check Player State
-                      </button>
-                      
-                      {/* Test button for forcing tab switch */}
-                      <button
-                        onClick={() => {
-                          console.log('🎬 Force tab switch button clicked')
-                          // Force document.hidden to true
-                          Object.defineProperty(document, 'hidden', {
-                            writable: true,
-                            value: true
-                          })
-                          // Dispatch visibility change event
-                          document.dispatchEvent(new Event('visibilitychange'))
-                          console.log('🎬 Forced tab switch - document.hidden:', document.hidden)
-                        }}
-                        className="mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Force Tab Switch
-                      </button>
-                      
-                      {/* Test button for checking iframe */}
-                      <button
-                        onClick={() => {
-                          console.log('🎬 Check iframe button clicked')
-                          const iframe = document.querySelector('iframe[src*="vimeo.com"]')
-                          console.log('🎬 Found iframe:', !!iframe)
-                          if (iframe) {
-                            console.log('🎬 Iframe src:', iframe.src)
-                            console.log('🎬 Iframe allow:', iframe.allow)
-                          }
-                        }}
-                        className="mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Check Iframe
-                      </button>
-                      
-                      {/* Test button for checking all states */}
-                      <button
-                        onClick={() => {
-                          console.log('🎬 Check all states button clicked')
-                          console.log('🎬 Video data:', {
-                            id: video?.id,
-                            title: video?.title,
-                            iframe: !!video?.iframe,
-                            vimeoId: video?.vimeoId,
-                            isFree: video?.isFree,
-                            isPremium: video?.isPremium
-                          })
-                          console.log('🎬 Vimeo player state:', {
-                            isReady: vimeoPlayer.isReady,
-                            isPlaying: vimeoPlayer.isPlaying,
-                            currentTime: vimeoPlayer.currentTime
-                          })
-                          console.log('🎬 Local state:', {
-                            isPlaying,
-                            isTabHidden,
-                            pausedPosition
-                          })
-                        }}
-                        className="mt-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Check All States
-                      </button>
-                      
-                      {/* Test button for checking event listeners */}
-                      <button
-                        onClick={() => {
-                          console.log('🎬 Check event listeners button clicked')
-                          console.log('🎬 Document hidden:', document.hidden)
-                          console.log('🎬 Document visibilityState:', document.visibilityState)
-                          console.log('🎬 Window focused:', document.hasFocus())
-                          
-                          // Test if we can dispatch events
-                          const testEvent = new Event('visibilitychange')
-                          document.dispatchEvent(testEvent)
-                          console.log('🎬 Dispatched test visibilitychange event')
-                        }}
-                        className="mt-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Check Event Listeners
-                      </button>
-                      
-                      {/* Test button for checking iframe autopause */}
-                      <button
-                        onClick={() => {
-                          console.log('🎬 Check iframe autopause button clicked')
-                          const iframe = document.querySelector('iframe[src*="vimeo.com"]')
-                          if (iframe) {
-                            console.log('🎬 Iframe src:', iframe.src)
-                            console.log('🎬 Iframe allow:', iframe.allow)
-                            
-                            // Check if autopause is enabled
-                            const hasAutopause = iframe.src.includes('autopause=1')
-                            console.log('🎬 Has autopause in src:', hasAutopause)
-                            
-                            // Check if autopause is in allow attribute
-                            const allowAutopause = iframe.allow?.includes('autopause')
-                            console.log('🎬 Has autopause in allow:', allowAutopause)
-                          } else {
-                            console.log('🎬 No Vimeo iframe found')
-                          }
-                        }}
-                        className="mt-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Check Iframe Autopause
-                      </button>
-                    </div>
-                  </div>
+                  {/* Removed tab hidden overlay */}
                 </div>
               )}
 

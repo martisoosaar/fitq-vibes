@@ -12,9 +12,6 @@ export default function UserDropdown() {
   const router = useRouter()
   const { user, logout, refreshAuth, isLoading } = useAuth()
   
-  // Debug log
-  console.log('UserDropdown - user trainer_unlocked:', user?.trainer_unlocked)
-  
   // Check if this is an impersonation session
   useEffect(() => {
     if (typeof window !== 'undefined') {

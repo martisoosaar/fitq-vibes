@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 
 interface User {
   id: number | string
@@ -26,10 +26,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const isInitialLoadRef = useRef(true)
 
   const checkAuth = async () => {
     try {
-      setIsLoading(true)
+      // Only set loading on initial load, not on background checks
+      if (isInitialLoadRef.current) {
+        setIsLoading(true)
+      }
       // Try to fetch user data from API (uses cookies for auth)
       const response = await fetch('/api/auth/me', {
         headers: { 
@@ -39,12 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cache: 'no-store' // Don't cache this request
       })
       
-      console.log('Auth check response status:', response.status)
       
       if (response.ok) {
         const userData = await response.json()
-        console.log('AuthContext received user data:', userData)
-        setUser({
+        const newUser = {
           id: userData.id || userData.user_id || userData.user?.id || '1',
           email: userData.email || userData.user?.email,
           name: userData.name || userData.user?.name || userData.email?.split('@')[0],
@@ -52,17 +54,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           trainer_unlocked: userData.trainer_unlocked || userData.user?.trainer_unlocked || false,
           slug: userData.slug || userData.user?.slug,
           isAdmin: userData.isAdmin || userData.user?.isAdmin || false
+        }
+        
+        // Only update if user data actually changed
+        setUser(prevUser => {
+          if (!prevUser) return newUser
+          if (JSON.stringify(prevUser) !== JSON.stringify(newUser)) {
+            return newUser
+          }
+          return prevUser
         })
       } else {
         // If not logged in, clear user
-        console.log('Auth check failed with status:', response.status)
         setUser(null)
       }
     } catch (error) {
       console.error('Auth check failed with error:', error)
       setUser(null)
     } finally {
-      setIsLoading(false)
+      if (isInitialLoadRef.current) {
+        setIsLoading(false)
+        isInitialLoadRef.current = false
+      }
     }
   }
 
@@ -70,23 +83,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial auth check
     checkAuth()
     
-    // Re-check auth status when window gains focus
+    // Check auth on focus, but with debouncing to prevent rapid checks
+    let focusTimeout: NodeJS.Timeout
     const handleFocus = () => {
-      checkAuth()
+      clearTimeout(focusTimeout)
+      focusTimeout = setTimeout(() => {
+        const isVideoPage = window.location.pathname.includes('/videos/')
+        if (!isInitialLoadRef.current && !isVideoPage) {
+          checkAuth()
+        }
+      }, 1000) // Wait 1 second after focus
     }
     
     window.addEventListener('focus', handleFocus)
     
-    // Also check periodically every 30 seconds when tab is active
+    // Check periodically, but less frequently - every 5 minutes instead of 30 seconds
+    // Skip if we're on video page to prevent interruptions
     const interval = setInterval(() => {
-      if (!document.hidden) {
+      const isVideoPage = window.location.pathname.includes('/videos/')
+      if (!document.hidden && !isInitialLoadRef.current && !isVideoPage) {
         checkAuth()
       }
-    }, 30000)
+    }, 300000) // 5 minutes
     
     return () => {
       window.removeEventListener('focus', handleFocus)
       clearInterval(interval)
+      clearTimeout(focusTimeout)
     }
   }, [])
 
