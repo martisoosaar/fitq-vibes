@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 function formatVideos(mainVideos: any[], additionalVideos: any[], trainerId: number) {
   // Remove duplicates and format, tracking if trainer is main or additional
@@ -193,8 +191,8 @@ export async function GET(
       }
     })
 
-    // Get follower and following counts
-    const [followersCount, followingCount, followStatus] = await Promise.all([
+    // Get follower and following counts, testimonials and social links
+    const [followersCount, followingCount, followStatus, testimonials, socialLinks] = await Promise.all([
       prisma.userFollow.count({
         where: { 
           followingId: trainer.id,
@@ -215,8 +213,29 @@ export async function GET(
             followingId: trainer.id
           }
         }
+      }),
+      // Get testimonials for rating calculation
+      prisma.trainerTestimonial.findMany({
+        where: {
+          trainerId: trainer.id,
+          isApproved: true
+        },
+        select: {
+          rating: true
+        }
+      }),
+      // Get social links
+      prisma.trainerSocialLink.findUnique({
+        where: {
+          userId: trainer.id
+        }
       })
     ])
+    
+    // Calculate average rating
+    const averageRating = testimonials.length > 0
+      ? testimonials.reduce((sum, t) => sum + t.rating, 0) / testimonials.length
+      : 0
     
     // Combine and format all videos
     const allVideos = formatVideos(
@@ -251,7 +270,22 @@ export async function GET(
       channelImage: channelImage,
       bio: user?.profileDesc || user?.trainerWelcomeDesc || '',
       welcomeTitle: user?.trainerWelcomeTitle || '',
-      location: user?.country || 'Eesti',
+      location: (() => {
+        if (!user?.country) return { name: 'Eesti', code: 'EE' }
+        try {
+          // Parse country if it's a JSON string
+          const countryData = typeof user.country === 'string' 
+            ? JSON.parse(user.country) 
+            : user.country
+          return {
+            name: countryData.name || 'Eesti',
+            code: countryData.id || 'EE'
+          }
+        } catch {
+          // If parsing fails, return default
+          return { name: 'Eesti', code: 'EE' }
+        }
+      })(),
       email: user?.email || '',
       isTrainer: true,
       isVerified: user?.displayOnTrainersList === 1,
@@ -259,11 +293,18 @@ export async function GET(
       lastLogin: user?.lastLogin,
       showIntro: user?.showIntro === 1,
       iframeIntro: user?.trainerIframeIntro,
+      socialMedia: socialLinks ? {
+        facebook: socialLinks.facebookLink,
+        instagram: socialLinks.instagramLink,
+        youtube: socialLinks.youtubeLink,
+        tiktok: socialLinks.tiktokLink,
+        twitter: socialLinks.twitterLink
+      } : null,
       stats: {
         videosCount: allVideos.length, // Use actual count of videos
         programsCount: programs.length,
-        rating: 4.5 + Math.random() * 0.5, // Mock rating
-        reviewsCount: Math.floor(trainer.videoViews / 100),
+        rating: averageRating > 0 ? Math.round(averageRating * 10) / 10 : null,
+        reviewsCount: testimonials.length,
         followers: followersCount,
         following: followingCount,
         totalViews: trainer.videoViews || 0

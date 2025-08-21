@@ -41,6 +41,40 @@ model UserNotification {
   @@map("user_notifications")
 }
 
+model TrainerTestimonial {
+  id         Int      @id @default(autoincrement())
+  trainerId  Int      // The trainer being reviewed
+  userId     Int      // The user who wrote the testimonial
+  rating     Int      // Rating from 1 to 5
+  comment    String   @db.Text
+  isApproved Boolean  @default(true) // For moderation if needed
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, isApproved])
+  @@index([userId])
+  @@map("trainer_testimonials")
+}
+
+model TrainerSocialLink {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique @map("user_id")
+  facebookLink  String?  @map("facebook_link") @db.Text
+  youtubeLink   String?  @map("youtube_link") @db.Text
+  instagramLink String?  @map("instagram_link") @db.Text
+  tiktokLink    String?  @map("tiktok_link") @db.Text
+  twitterLink   String?  @map("twitter_link") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  trainer Trainer @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("trainer_social_links")
+}
+
 model User {
   id                                Int                  @id @default(autoincrement())
   email                             String               @unique
@@ -114,6 +148,7 @@ model User {
   programUsers                      TrainerProgramUser[] @relation("ProgramUsers")
   adminImpersonations               ImpersonationToken[] @relation("AdminTokens")
   impersonatedSessions              ImpersonationToken[] @relation("ImpersonatedTokens")
+  testimonials                      TrainerTestimonial[]
 }
 
 model LoginCode {
@@ -161,17 +196,19 @@ model RefreshToken {
 }
 
 model Trainer {
-  id            Int         @id @default(autoincrement())
-  slug          String      @unique
+  id            Int                  @id @default(autoincrement())
+  slug          String               @unique
   name          String
   avatar        String?
-  videosCount   Int         @default(0)
-  videoViews    Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  videosCount   Int                  @default(0)
+  videoViews    Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
   programs      Program[]
   videos        Video[]
   videoViewsLog VideoView[]
+  testimonials  TrainerTestimonial[]
+  socialLinks   TrainerSocialLink?
 }
 
 model Language {

@@ -129,34 +129,9 @@ export async function GET(
       })
       
       if (trainerData) {
-        // Then get additional info from User table if needed
-        const userData = await prisma.user.findUnique({
-          where: { id: Number(program.trainerId) },
-          select: {
-            avatar: true,
-            externalAvatar: true
-          }
-        })
-        
-        // Format avatar URL - prioritize externalAvatar
-        let avatarUrl = '/images/trainers/avatar.png'
-        if (userData) {
-          if (userData.externalAvatar) {
-            avatarUrl = userData.externalAvatar
-          } else if (userData.avatar) {
-            if (userData.avatar.startsWith('http')) {
-              avatarUrl = userData.avatar
-            } else if (userData.avatar.startsWith('/')) {
-              avatarUrl = userData.avatar
-            } else {
-              avatarUrl = `https://f5bef85cec4c638e3231-250b1cf964c3a77213444ba2f00d4811.ssl.cf3.rackcdn.com/${userData.avatar}`
-            }
-          } else if (trainerData.avatar) {
-            avatarUrl = trainerData.avatar
-          }
-        } else if (trainerData.avatar) {
-          avatarUrl = trainerData.avatar
-        }
+        // Use the avatar from Trainer table as it's already correctly set
+        // (it already contains the local path like /images/avatars/trainer-126.jpg)
+        let avatarUrl = trainerData.avatar || '/images/trainers/avatar.png'
         
         trainer = {
           id: trainerData.id,

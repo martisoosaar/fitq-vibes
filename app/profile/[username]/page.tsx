@@ -7,8 +7,9 @@ import {
   ArrowLeft, Star, Users, Award, Calendar, MapPin, 
   Mail, Phone, Globe, Facebook, Instagram, Youtube,
   Play, Lock, Clock, CheckCircle, MessageCircle,
-  TrendingUp, Target, Activity, Heart
+  TrendingUp, Target, Activity, Heart, Twitter
 } from 'lucide-react'
+import { FaTiktok } from 'react-icons/fa'
 
 interface UserProfile {
   id: string
@@ -16,7 +17,10 @@ interface UserProfile {
   name: string
   avatar: string
   bio: string
-  location?: string
+  location?: {
+    name: string
+    code: string
+  }
   email?: string
   phone?: string
   website?: string
@@ -24,6 +28,8 @@ interface UserProfile {
     facebook?: string
     instagram?: string
     youtube?: string
+    tiktok?: string
+    twitter?: string
   }
   isTrainer: boolean
   isVerified: boolean
@@ -95,7 +101,7 @@ export default function ProfilePage() {
   const username = params.username as string
   
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [activeTab, setActiveTab] = useState<'overview' | 'videos' | 'programs' | 'achievements' | 'reviews'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'videos' | 'programs' | 'achievements' | 'reviews' | 'testimonials'>('overview')
   const [videos, setVideos] = useState<Video[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [achievements, setAchievements] = useState<Achievement[]>([])
@@ -137,7 +143,7 @@ export default function ProfilePage() {
         email: data.email,
         phone: undefined,
         website: undefined,
-        socialMedia: undefined,
+        socialMedia: data.socialMedia,
         isTrainer: data.isTrainer,
         isVerified: data.isVerified,
         joinedDate: new Date(data.joinedDate).toISOString().split('T')[0],
@@ -347,7 +353,7 @@ export default function ProfilePage() {
                       {profile.stats.rating && (
                         <div className="flex items-center gap-1">
                           <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-sm sm:text-base">{profile.stats.rating}</span>
+                          <span className="text-sm sm:text-base">{profile.stats.rating.toFixed(1)}</span>
                           <span className="text-gray-400 text-sm">({profile.stats.reviewsCount})</span>
                         </div>
                       )}
@@ -469,17 +475,17 @@ export default function ProfilePage() {
               <span className="hidden sm:inline">Programmid ({profile.stats.programsCount})</span>
               <span className="sm:hidden">Programmid</span>
             </button>
-            <button
-              onClick={() => setActiveTab('reviews')}
-              className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base whitespace-nowrap ${
-                activeTab === 'reviews'
+            <Link
+              href={`/profile/${username}/testimonials`}
+              className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base whitespace-nowrap inline-block ${
+                activeTab === 'testimonials'
                   ? 'bg-[#40b236] text-white'
                   : 'text-gray-300 hover:text-white'
               }`}
             >
               <span className="hidden sm:inline">Arvustused ({profile.stats.reviewsCount})</span>
               <span className="sm:hidden">Arvustused</span>
-            </button>
+            </Link>
           </div>
         )}
 
@@ -592,7 +598,18 @@ export default function ProfilePage() {
                       {profile.location && (
                         <div className="flex items-center gap-2 text-gray-300">
                           <MapPin className="w-4 h-4" />
-                          {profile.location}
+                          <span className="flex items-center gap-2">
+                            <img 
+                              src={`https://flagcdn.com/24x18/${profile.location.code.toLowerCase()}.png`}
+                              alt={profile.location.name}
+                              className="w-6 h-4"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                              }}
+                            />
+                            {profile.location.name === 'Estonia' ? 'Eesti' : profile.location.name}
+                          </span>
                         </div>
                       )}
                       {profile.email && (
@@ -617,23 +634,56 @@ export default function ProfilePage() {
 
                     {profile.socialMedia && (
                       <div className="mt-4 pt-4 border-t border-[#4d5665]">
-                        <div className="flex gap-2">
+                        <h4 className="text-sm font-semibold mb-3 text-gray-300">Sotsiaalmeedia</h4>
+                        <div className="flex gap-2 flex-wrap">
                           {profile.socialMedia.facebook && (
-                            <a href={`https://facebook.com/${profile.socialMedia.facebook}`} 
+                            <a href={profile.socialMedia.facebook.startsWith('http') 
+                                ? profile.socialMedia.facebook 
+                                : `https://facebook.com/${profile.socialMedia.facebook}`} 
+                               target="_blank"
+                               rel="noopener noreferrer"
                                className="p-2 bg-[#2c313a] rounded-lg hover:bg-[#4d5665] transition-colors">
                               <Facebook className="w-5 h-5" />
                             </a>
                           )}
                           {profile.socialMedia.instagram && (
-                            <a href={`https://instagram.com/${profile.socialMedia.instagram}`} 
+                            <a href={profile.socialMedia.instagram.startsWith('http')
+                                ? profile.socialMedia.instagram
+                                : `https://instagram.com/${profile.socialMedia.instagram}`} 
+                               target="_blank"
+                               rel="noopener noreferrer"
                                className="p-2 bg-[#2c313a] rounded-lg hover:bg-[#4d5665] transition-colors">
                               <Instagram className="w-5 h-5" />
                             </a>
                           )}
                           {profile.socialMedia.youtube && (
-                            <a href={`https://youtube.com/${profile.socialMedia.youtube}`} 
+                            <a href={profile.socialMedia.youtube.startsWith('http')
+                                ? profile.socialMedia.youtube
+                                : `https://youtube.com/${profile.socialMedia.youtube}`} 
+                               target="_blank"
+                               rel="noopener noreferrer"
                                className="p-2 bg-[#2c313a] rounded-lg hover:bg-[#4d5665] transition-colors">
                               <Youtube className="w-5 h-5" />
+                            </a>
+                          )}
+                          {profile.socialMedia.tiktok && (
+                            <a href={profile.socialMedia.tiktok.startsWith('http')
+                                ? profile.socialMedia.tiktok
+                                : `https://tiktok.com/@${profile.socialMedia.tiktok}`} 
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="p-2 bg-[#2c313a] rounded-lg hover:bg-[#4d5665] transition-colors">
+                              <FaTiktok className="w-5 h-5" />
+                            </a>
+                          )}
+                          {profile.socialMedia.twitter && (
+                            <a href={profile.socialMedia.twitter.startsWith('http')
+                                ? profile.socialMedia.twitter
+                                : `https://twitter.com/${profile.socialMedia.twitter}`} 
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="p-2 bg-[#2c313a] rounded-lg hover:bg-[#4d5665] transition-colors">
+                              <Twitter className="w-5 h-5" />
                             </a>
                           )}
                         </div>
