@@ -1,48 +1,24 @@
-**Frontend (Next.js + Tailwind) — Plaan**
+**FitQ Vibes — Next.js Monoliit**
 
-**Stack**
-- Next.js (App Router, TypeScript)
-- Tailwind CSS v3.4+, PostCSS/Autoprefixer
-- Data layer: React Query või SWR
-- i18n: next-intl või next-i18next
-- Analytics: GTM/Gtag + consent mode
-- API kliendid: OpenAPI genereeritud (typescript-fetch või axios) + kerge adapter
+- Eesmärk: Koondada front ja back ühte Next.js teenusesse, et lihtsustada deploy’d ja vähendada keerukust.
+- Sisu: `frontend` (React + Next.js + Tailwind CSS; sisaldab ka API route’e), `docs` (OpenAPI, arhitektuur).
 
-**Moodulid**
-- Auth: NextAuth.js (Credentials + Google/Facebook), SSR-sõbralik cookie-põhine sessioon
-- Route-guards: server components + middleware (edge) kaitstud teedele
-- UI: Headless UI/Radix + Tailwind komponendid; ikoonid (Heroicons)
-- State: kerge lokaalne + React Query server-andmete jaoks
+**Staatus**
+- Uuendatud suund: Next.js + Tailwind, API Next.js route handleritega. Laravel skeleton jäeti arhiveeritud näitena, kuid ei kasutata edaspidi.
 
-**Migreerimine**
-- Kaardista Nuxt `pages` → Next App Router segmentid (sh dünaamilised teed)
-- Teenused (`~/services`) → OpenAPI typed kliendid + hooks (useXxx)
-- I18n tõlkefailid → `app/[locale]/...` struktuur
-- Nuxt middleware → Next middleware + server actions
+**Struktuur**
+- `frontend/` — Next.js App Router (TypeScript, Tailwind, React Query/SWR, i18n, GTM/consent) + `app/api/*` backend endpointid.
+- `docs/openapi/` — OpenAPI 3.0 leping, kliendigeneratsiooni alus.
 
-**Järgmised sammud**
-- Lisada Next.js skeleton (package.json, tsconfig, tailwind config) kui install lubatud
-- Kirjutada auth voog (NextAuth + backend endpointid)
-- Luua layout’id ja baaslehed (index, login, videos, trainers, programs)
+**Otsused, mida vaja kinnitada**
+- Auth: NextAuth.js (Credentials+OAuth) + Laravel Sanctum vs puhas JWT (access/refresh cookie’d).
+- Admin: jätkame Voyager’iga või liigume Filament/Nova’le.
+- DB: MySQL 8 või Postgres 15; Redis job’ideks/cache’iks.
 
-**Auth voog (paroolideta, 1 aasta seadepüsivus)**
-- Sisselogimise UX:
-  1) E-maili sisestus → POST `/auth/email-code/request` (ei avalda, kas email eksisteerib).
-  2) Koodivorm (6 numbrit) → POST `/auth/email-code/verify` (device_name, challenge_id, code).
-  3) Backend tagastab `access_token` + seab refresh-cookie 365 päevaks. Me hoiame access tokenit mälus (või secure cookie, kui SSR vajalik) ja uuendame taustal.
-- OAuth (Google/Facebook/Stebby):
-  - Nupu klik → Next.js API `/api/auth/oauth/{provider}` → provider → callback `/api/auth/oauth/{provider}/callback` → seab refresh-cookie ja alustab sessiooni.
-  - Env: `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL`, `FACEBOOK_APP_ID/SECRET/REDIRECT_URL`, `STEBBY_CLIENT_ID/SECRET/AUTH_URL/TOKEN_URL/USERINFO_URL/REDIRECT_URL`.
-- Säilitamine:
-  - Refresh: httpOnly Secure cookie (365 päeva), SameSite=Lax; Access: lühike (15 min) kas memory või non-httpOnly cookie SSR tarbeks. Soovitus: kasutada server-poolset `next/headers` lugemist ja edastada Authorization päis server-komponentides.
-- Uuendamine:
-  - `POST /auth/refresh` edge middleware’is või React Query `onError` handleris (401 korral), roteerib refresh’i.
-- Logout:
-  - `POST /auth/logout` + frontis cache reset + suunamine loginile.
+**Kohalik arendus (siht)**
+- Docker Compose: `frontend`, `backend`, `db`, `redis`, `mailhog`. (Lisame failid, kui ülalotsused kinnitatud.)
 
-**Komponendid/Lehed**
-- `app/(auth)/login` — email sisestus + koodivorm; OAuth nupud; seadmenimi automaatselt (OS/UA) või käsitsi.
-- `app/(protected)/*` — middleware kontrollib access tokenit, vajadusel käivitab refreshi.
-
-**Turve**
-- Rate limit login/verify; koodi bruteforce kaitse; ühekordne kood; pettusevastased mikroviited (aeglustused, CAPTCHAvajadus kui rünnak).
+**Kiired järgmised sammud**
+1) Täiendada Next.js API auth endpointid (paroolideta + OAuth stubid) ja lisada DB-kiht (Prisma + Postgres/MySQL).
+2) Kirjeldada OpenAPI skeem (server: http://localhost:3000/api) ja genereerida typed kliendid.
+3) Viia videod/treenerid/programmid uutele API-dele samm-sammult.

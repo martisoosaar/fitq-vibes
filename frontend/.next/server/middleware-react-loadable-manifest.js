@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"app/settings/account/page.tsx -> @/components/FlagDropdown\":{\"id\":\"app/settings/account/page.tsx -> @/components/FlagDropdown\",\"files\":[\"static/chunks/_app-pages-browser_components_FlagDropdown_tsx.js\"]}}"
