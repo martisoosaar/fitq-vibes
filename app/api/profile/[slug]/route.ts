@@ -91,9 +91,21 @@ export async function GET(
   try {
     const { slug } = await params
 
-    // Find trainer by slug
+    // First try to find user by simpleLink (username)
+    const user = await prisma.user.findFirst({
+      where: { simpleLink: slug }
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    // Then find trainer by user ID
     const trainer = await prisma.trainer.findUnique({
-      where: { slug },
+      where: { id: user.id },
       include: {
         videos: {
           where: {
@@ -102,7 +114,6 @@ export async function GET(
           orderBy: {
             createdAt: 'desc'
           },
-          take: 20,
           include: {
             category: true
           }
@@ -116,29 +127,6 @@ export async function GET(
         { status: 404 }
       )
     }
-
-    // Get associated user data
-    const user = await prisma.user.findUnique({
-      where: { id: trainer.id },
-      select: {
-        name: true,
-        email: true,
-        profileDesc: true,
-        avatar: true,
-        externalAvatar: true,
-        trainerChannelImage: true,
-        biographyImage: true,
-        trainerWelcomeTitle: true,
-        trainerWelcomeDesc: true,
-        trainerIframeIntro: true,
-        showIntro: true,
-        displayOnTrainersList: true,
-        country: true,
-        createdAt: true,
-        lastLogin: true,
-        totalVideoViews: true
-      }
-    })
     
     // Also get videos where this trainer is in video_trainers table
     const additionalVideos = await prisma.videoTrainer.findMany({
@@ -152,7 +140,6 @@ export async function GET(
           }
         }
       },
-      take: 20,
       orderBy: {
         video: {
           createdAt: 'desc'
@@ -165,13 +152,13 @@ export async function GET(
 
     // Determine channel/biography image
     let channelImage = null
-    if (user?.trainerChannelImage) {
+    if (user.trainerChannelImage) {
       if (user.trainerChannelImage.startsWith('http')) {
         channelImage = user.trainerChannelImage
       } else {
         channelImage = `https://f5bef85cec4c638e3231-250b1cf964c3a77213444ba2f00d4811.ssl.cf3.rackcdn.com/${user.trainerChannelImage}`
       }
-    } else if (user?.biographyImage) {
+    } else if (user.biographyImage) {
       if (user.biographyImage.startsWith('http')) {
         channelImage = user.biographyImage
       } else {
@@ -268,10 +255,10 @@ export async function GET(
       name: trainer.name,
       avatar: avatarUrl,
       channelImage: channelImage,
-      bio: user?.profileDesc || user?.trainerWelcomeDesc || '',
-      welcomeTitle: user?.trainerWelcomeTitle || '',
+      bio: user.profileDesc || user.trainerWelcomeDesc || '',
+      welcomeTitle: user.trainerWelcomeTitle || '',
       location: (() => {
-        if (!user?.country) return { name: 'Eesti', code: 'EE' }
+        if (!user.country) return { name: 'Eesti', code: 'EE' }
         try {
           // Parse country if it's a JSON string
           const countryData = typeof user.country === 'string' 
@@ -286,13 +273,13 @@ export async function GET(
           return { name: 'Eesti', code: 'EE' }
         }
       })(),
-      email: user?.email || '',
+      email: user.email || '',
       isTrainer: true,
-      isVerified: user?.displayOnTrainersList === 1,
-      joinedDate: user?.createdAt || new Date(),
-      lastLogin: user?.lastLogin,
-      showIntro: user?.showIntro === 1,
-      iframeIntro: user?.trainerIframeIntro,
+      isVerified: user.displayOnTrainersList === 1,
+      joinedDate: user.createdAt || new Date(),
+      lastLogin: user.lastLogin,
+      showIntro: user.showIntro === 1,
+      iframeIntro: user.trainerIframeIntro,
       socialMedia: socialLinks ? {
         facebook: socialLinks.facebookLink,
         instagram: socialLinks.instagramLink,

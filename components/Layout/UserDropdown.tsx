@@ -113,7 +113,7 @@ export default function UserDropdown() {
       >
         {user.avatar ? (
           <img
-            src={user.avatar.startsWith('/') ? user.avatar : `/${user.avatar}`}
+            src={user.avatar}
             alt={user.name}
             className="w-8 h-8 rounded-full object-cover"
             onError={(e) => {
