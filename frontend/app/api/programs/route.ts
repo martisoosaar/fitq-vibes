@@ -1,40 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
     const programs = await prisma.trainerProgram.findMany({
       where: {
-        status: 'PUBLIC',
-        deletedAt: null
+        deleted_at: null,
+        // Show all non-deleted programs
+        status: {
+          in: ['PUBLIC', 'LIMITED_ACCESS', 'PRIVATE']
+        }
       },
       select: {
         id: true,
         title: true,
-        shortDescription: true,
+        short_description: true,
         description: true,
         picture: true,
-        urlSlug: true,
-        unitLength: true,
-        unitVisibility: true,
-        languageId: true,
+        url_slug: true,
+        unit_length: true,
+        unit_visibility: true,
+        language_id: true,
         status: true,
-        commentsEnabled: true,
-        feedbackEnabled: true,
-        createdAt: true,
-        trainerId: true,
-        trainer: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true
-          }
-        }
+        comments_enabled: true,
+        feedback_enabled: true,
+        created_at: true,
+        trainer_id: true,
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       }
     })
 
@@ -55,37 +49,30 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Create slug from title if urlSlug is not set
-      const slug = program.urlSlug || program.title.toLowerCase()
+      // Create slug from title if url_slug is not set
+      const slug = program.url_slug || program.title.toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
 
       return {
         id: Number(program.id),
         title: program.title,
-        shortDescription: program.shortDescription,
+        shortDescription: program.short_description,
         description: program.description,
         picture: imageUrl,
         slug: slug,
-        unitLength: program.unitLength,
-        unitVisibility: program.unitVisibility,
-        languageId: program.languageId,
+        unitLength: program.unit_length,
+        unitVisibility: program.unit_visibility,
+        languageId: program.language_id,
         status: program.status,
-        commentsEnabled: program.commentsEnabled,
-        feedbackEnabled: program.feedbackEnabled,
-        createdAt: program.createdAt,
-        trainer: program.trainer ? {
-          id: program.trainer.id,
-          name: program.trainer.name || 'Treener',
-          avatar: program.trainer.avatar?.startsWith('/') 
-            ? program.trainer.avatar 
-            : `/${program.trainer.avatar || 'users/default.png'}`,
-          slug: program.trainer.name?.toLowerCase().replace(/\s+/g, '') || `user-${program.trainer.id}`
-        } : null
+        commentsEnabled: program.comments_enabled,
+        feedbackEnabled: program.feedback_enabled,
+        createdAt: program.created_at,
+        trainer: null // Temporarily null until we fix trainer relation
       }
     })
 
-    return NextResponse.json(transformedPrograms)
+    return NextResponse.json({ programs: transformedPrograms })
   } catch (error) {
     console.error('Failed to fetch programs:', error)
     return NextResponse.json({ error: 'Failed to fetch programs' }, { status: 500 })

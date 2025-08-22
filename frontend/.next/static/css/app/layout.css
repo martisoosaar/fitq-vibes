@@ -1109,6 +1109,9 @@
   .bg-gray-200 {
     background-color: var(--color-gray-200);
   }
+  .bg-gray-500 {
+    background-color: var(--color-gray-500);
+  }
   .bg-gray-500\/20 {
     background-color: color-mix(in srgb, oklch(55.1% 0.027 264.364) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {

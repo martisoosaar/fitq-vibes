@@ -57,8 +57,9 @@ export default function ProgramsPage() {
       }
       
       const data = await response.json()
-      setPrograms(data)
-      setFilteredPrograms(data)
+      const programsArray = data.programs || data
+      setPrograms(programsArray)
+      setFilteredPrograms(programsArray)
     } catch (err) {
       console.error('Failed to fetch programs:', err)
       setError(true)

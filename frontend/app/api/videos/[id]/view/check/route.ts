@@ -20,98 +20,49 @@ export async function POST(
     }
 
     const tokenData = await validateRefreshToken(refreshCookie.value)
-    if (!tokenData || !tokenData.user) {
+    if (!tokenData) {
       return NextResponse.json({ hasResumableSession: false })
     }
     
-    const userId = tokenData.user.id
+    const userId = Number(tokenData.userId)
     const videoId = parseInt(id)
     
     if (isNaN(videoId)) {
       return NextResponse.json({ hasResumableSession: false })
     }
 
-    // Check for sessions within the last week
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    
-    // First check for active sessions
-    const activeView = await prisma.videoView.findFirst({
+    // Check for recent viewing session in legacy table
+    const recentView = await prisma.video_time_watched_by_users.findFirst({
       where: {
-        videoId,
-        userId,
-        stillWatching: true,
-        createdAt: {
-          gte: oneWeekAgo
-        }
+        video_id: videoId,
+        user_id: userId,
+        watch_time_seconds: {
+          gt: 10 // More than 10 seconds watched
+        },
+        completed_at: null // Only uncompleted sessions
       },
       orderBy: {
-        updatedAt: 'desc'
+        updated_at: 'desc'
       }
     })
 
-    if (activeView) {
-      console.log('Found active session:', activeView.id)
+    if (recentView) {
+      console.log('Found recent session:', recentView.id, 'watch time:', recentView.watch_time_seconds)
       return NextResponse.json({
         hasResumableSession: true,
-        viewId: activeView.id,
-        playheadPosition: activeView.playheadPosition,
-        watchTimeSeconds: activeView.watchTimeSeconds,
-        updatedAt: activeView.updatedAt
+        viewId: Number(recentView.id),
+        playheadPosition: recentView.playhead_position || recentView.watch_time_seconds, // Use playhead if available
+        watchTimeSeconds: recentView.watch_time_seconds,
+        updatedAt: recentView.updated_at
       })
     }
 
-    // Check for recent incomplete sessions
-    const recentView = await prisma.videoView.findFirst({
-      where: {
-        videoId,
-        userId,
-        stillWatching: false,
-        createdAt: {
-          gte: oneWeekAgo
-        }
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      },
-      include: {
-        video: {
-          select: {
-            duration: true
-          }
-        }
-      }
-    })
-
-    if (recentView && recentView.playheadPosition > 0) {
-      const videoDurationSeconds = recentView.video.duration || 0
-      const percentageWatched = videoDurationSeconds > 0 
-        ? (recentView.playheadPosition / videoDurationSeconds) * 100 
-        : 0
-      
-      // If video was less than 80% complete, it's resumable
-      if (percentageWatched < 80) {
-        console.log('Found resumable completed session:', recentView.id)
-        return NextResponse.json({
-          hasResumableSession: true,
-          viewId: recentView.id,
-          playheadPosition: recentView.playheadPosition,
-          watchTimeSeconds: recentView.watchTimeSeconds,
-          updatedAt: recentView.updatedAt
-        })
-      }
-    }
-
-    // No resumable session found
-    return NextResponse.json({
-      hasResumableSession: false
-    })
+    // No resumable sessions found
+    console.log('No resumable sessions found')
+    return NextResponse.json({ hasResumableSession: false })
     
   } catch (error) {
     console.error('Error checking video view:', error)
-    return NextResponse.json(
-      { hasResumableSession: false },
-      { status: 200 } // Return 200 even on error to not block playback
-    )
+    return NextResponse.json({ hasResumableSession: false })
   }
 }

@@ -1,10 +1,40 @@
 {
   "pages": {
+    "/api/auth/me/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/me/route.js"
+    ],
+    "/api/videos/[id]/view/resume/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/videos/[id]/view/resume/route.js"
+    ],
+    "/api/videos/[id]/view/update/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/videos/[id]/view/update/route.js"
+    ],
+    "/api/admin/video-views/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/video-views/route.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
+    ],
+    "/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/page.js"
+    ],
+    "/api/admin/users/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/users/route.js"
     ],
     "/programs/page": [
       "static/chunks/webpack.js",
@@ -16,31 +46,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/programs/route.js"
     ],
-    "/api/auth/me/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/me/route.js"
-    ],
-    "/trainers/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/trainers/page.js"
-    ],
-    "/api/trainers/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/trainers/route.js"
-    ],
-    "/profile/[username]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/profile/[username]/page.js"
-    ],
-    "/api/profile/[slug]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/profile/[slug]/route.js"
-    ],
     "/videos/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -51,30 +56,30 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/videos/route.js"
     ],
-    "/(auth)/login/page": [
+    "/videos/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
+      "static/chunks/app/videos/[id]/page.js"
     ],
-    "/settings/layout": [
+    "/api/videos/[id]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/settings/layout.js"
+      "static/chunks/app/api/videos/[id]/route.js"
     ],
-    "/settings/account/page": [
+    "/api/videos/[id]/comments/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/settings/account/page.js"
+      "static/chunks/app/api/videos/[id]/comments/route.js"
     ],
-    "/api/user/profile/route": [
+    "/api/videos/[id]/view/check/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/user/profile/route.js"
+      "static/chunks/app/api/videos/[id]/view/check/route.js"
     ],
-    "/settings/page": [
+    "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/settings/page.js"
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }

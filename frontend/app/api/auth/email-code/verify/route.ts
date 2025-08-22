@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { consumeLoginCode, createRefresh, createSession, findOrCreateUserByEmail } from '@/lib/repo/auth';
+import { validateLoginCode, markLoginCodeConsumed, createRefresh, createSession, findOrCreateUserByEmail } from '@/lib/repo/auth';
 import { signJwt } from '@/lib/jwt';
 
 export async function POST(req: NextRequest) {
@@ -7,8 +7,7 @@ export async function POST(req: NextRequest) {
   const { challenge_id, code } = body;
   console.log('Verify request:', body);
   if (!challenge_id || !code) return NextResponse.json({ message: 'Invalid' }, { status: 400 });
-  const rec = await consumeLoginCode(challenge_id, code);
-  console.log('Login code result:', rec);
+  const rec = await validateLoginCode(challenge_id, code);
   if (!rec) return NextResponse.json({ message: 'Invalid or expired code' }, { status: 400 });
 
   let user;
@@ -24,10 +23,10 @@ export async function POST(req: NextRequest) {
   if (userAgent.includes('Mobile')) deviceName = 'Mobile Browser';
   else if (userAgent.includes('Tablet')) deviceName = 'Tablet Browser';
   
-  const session = await createSession(user.id, deviceName, req.ip || undefined, req.headers.get('user-agent') || undefined);
-  const { rec: refresh, plain } = await createRefresh(user.id, session.id, 60 * 60 * 24 * 365);
+  const session = await createSession(Number((user as any).id), deviceName, req.ip || undefined, req.headers.get('user-agent') || undefined);
+  const { rec: refresh, plain } = await createRefresh(Number((user as any).id), session.id, 60 * 60 * 24 * 365);
 
-  const access = await signJwt({ sub: user.id, email: user.email }, 900);
+  const access = await signJwt({ sub: Number((user as any).id), email: (user as any).email }, 900);
   const res = NextResponse.json({ access_token: access, token_type: 'Bearer', expires_in: 900 });
   res.cookies.set('fitq_refresh', plain, {
     httpOnly: true,
@@ -36,5 +35,6 @@ export async function POST(req: NextRequest) {
     path: '/',
     maxAge: 60 * 60 * 24 * 365,
   });
+  await markLoginCodeConsumed(challenge_id);
   return res;
 }

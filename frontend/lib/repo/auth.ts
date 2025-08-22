@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 export async function createLoginCode(email: string, code: string, ttlSec = 600) {
   const challengeId = crypto.randomUUID();
   const codeHash = crypto.createHash('sha256').update(code).digest('hex');
-  const rec = await prisma.loginCode.create({
+  await prisma.loginCode.create({
     data: {
       email: email.toLowerCase(),
       challengeId,
@@ -12,34 +12,34 @@ export async function createLoginCode(email: string, code: string, ttlSec = 600)
       expiresAt: new Date(Date.now() + ttlSec * 1000),
     },
   });
-  return rec;
+  return { challengeId };
 }
 
-export async function consumeLoginCode(challengeId: string, code: string) {
+export async function validateLoginCode(challengeId: string, code: string) {
   const rec = await prisma.loginCode.findUnique({ where: { challengeId } });
   if (!rec) return null;
   if (rec.consumedAt || rec.expiresAt < new Date() || rec.attempts >= rec.maxAttempts) return null;
   const hash = crypto.createHash('sha256').update(code).digest('hex');
-  const attempts = rec.attempts + 1;
   if (hash !== rec.codeHash) {
-    await prisma.loginCode.update({ where: { id: rec.id }, data: { attempts } });
+    await prisma.loginCode.update({ where: { id: rec.id }, data: { attempts: rec.attempts + 1 } });
     return null;
   }
-  const updated = await prisma.loginCode.update({ where: { id: rec.id }, data: { attempts, consumedAt: new Date() } });
-  return updated;
+  // Do not consume yet; caller will mark consumed after successful session creation
+  return rec;
+}
+
+export async function markLoginCodeConsumed(challengeId: string) {
+  await prisma.loginCode.update({ where: { challengeId }, data: { consumedAt: new Date(), attempts: { increment: 1 } } });
 }
 
 export async function findOrCreateUserByEmail(email: string) {
   const e = email.toLowerCase();
-  const found = await prisma.user.findUnique({ where: { email: e } });
+  const found = await prisma.users.findFirst({ where: { email: e } });
   if (found) {
-    // Block login for deleted users
-    if (found.deletedAt) {
-      throw new Error('Kasutaja on kustutatud ja ei saa sisse logida');
-    }
-    return found;
+    return found as any;
   }
-  return prisma.user.create({ data: { email: e } });
+  // Create minimal legacy user
+  return prisma.users.create({ data: { email: e } }) as any;
 }
 
 export async function createSession(userId: number, deviceName?: string, ip?: string, ua?: string) {
@@ -94,18 +94,10 @@ export async function validateRefreshToken(plain: string) {
       expiresAt: { gt: new Date() }, 
       tokenHash: hash 
     }, 
-    orderBy: { id: 'desc' },
-    include: {
-      user: true
-    }
+    orderBy: { id: 'desc' }
   });
   
   if (!token) return null;
-  
-  // Block access for deleted users
-  if (token.user.deletedAt) {
-    return null;
-  }
   
   // Update session last used
   await prisma.deviceSession.update({
@@ -113,6 +105,9 @@ export async function validateRefreshToken(plain: string) {
     data: { lastUsedAt: new Date() }
   });
   
-  return token;
+  return {
+    userId: token.userId,
+    sessionId: token.deviceSessionId
+  };
 }
 

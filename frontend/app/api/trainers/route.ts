@@ -10,58 +10,79 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '30')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    // Build where clause for search
-    const where = search ? {
-      OR: [
+    // Build where clause on users table
+    const where: any = {
+      display_on_trainers_list: true,
+      trainer_unlocked: true
+    }
+    if (search) {
+      where.OR = [
         { name: { contains: search } },
-        { slug: { contains: search } }
+        { simple_link: { contains: search } },
+        { email: { contains: search } }
       ]
-    } : {}
+    }
 
-    // Get trainers with their associated user data
-    const trainers = await prisma.trainer.findMany({
+    // Get trainers from users table
+    const users = await prisma.users.findMany({
       where,
       skip: offset,
       take: limit,
       orderBy: [
-        { videoViews: 'desc' },
+        { total_video_views: 'desc' },
         { name: 'asc' }
       ],
-      include: {
-        programs: true
+      select: {
+        id: true,
+        name: true,
+        simple_link: true,
+        avatar: true,
+        external_avatar: true,
+        profile_desc: true,
+        display_on_trainers_list: true,
+        trainer_channel_image: true,
+        total_video_views: true
       }
     })
 
-    // Get associated user data for each trainer
+    // Map to UI payload and compute derived fields
     const trainersWithUserData = await Promise.all(
-      trainers.map(async (trainer) => {
-        const user = await prisma.user.findUnique({
-          where: { id: trainer.id },
-          select: {
-            profileDesc: true,
-            displayOnTrainersList: true,
-            trainerChannelImage: true,
-            externalAvatar: true
+      users.map(async (u) => {
+        // Avatar resolution
+        let avatarUrl: string | null = null
+        if (u.external_avatar) {
+          avatarUrl = u.external_avatar
+        } else if (u.avatar) {
+          if (u.avatar.startsWith('http')) {
+            avatarUrl = u.avatar
+          } else if (u.avatar.startsWith('/')) {
+            avatarUrl = u.avatar
+          } else {
+            avatarUrl = `/${u.avatar}`
           }
-        })
+        }
+        if (!avatarUrl) avatarUrl = '/images/default-avatar.png'
 
-        // Use avatar from Trainer table (already fixed with local paths)
-        let avatarUrl = trainer.avatar || '/images/trainers/avatar.png'
+        const [programsCount, mainVideosCount, coVideosCount] = await Promise.all([
+          prisma.trainerProgram.count({ where: { trainer_id: Number(u.id), deleted_at: null } }),
+          prisma.videos.count({ where: { user_id: Number(u.id), OR: [{ video_deleted: 0 }, { video_deleted: null }] } }),
+          prisma.videoTrainer.count({ where: { trainer_id: BigInt(Number(u.id)) } })
+        ])
 
         return {
-          id: trainer.id,
-          name: trainer.name,
-          slug: trainer.slug,
+          id: Number(u.id),
+          name: u.name || '',
+          slug: u.simple_link || (u.name ? u.name.toLowerCase().replace(/\s+/g, '-') : String(u.id)),
           avatar: avatarUrl,
-          channelImage: user?.trainerChannelImage || null,
-          description: user?.profileDesc || null,
-          videosCount: trainer.videosCount,
-          videoViews: trainer.videoViews,
-          subscribersCount: Math.floor(trainer.videoViews / 10), // Estimated
-          hasTickets: false, // Will be updated when we add tickets
-          hasPrograms: trainer.programs?.length > 0 || false,
-          isVerified: user?.displayOnTrainersList === 1,
-          displayOnList: user?.displayOnTrainersList === 1
+          channelImage: u.trainer_channel_image || null,
+          description: u.profile_desc || null,
+          videosCount: (mainVideosCount + coVideosCount),
+          videoViews: u.total_video_views || 0,
+          subscribersCount: Math.floor((u.total_video_views || 0) / 10),
+          hasTickets: false,
+          hasPrograms: programsCount > 0,
+          isVerified: !!u.display_on_trainers_list,
+          displayOnList: !!u.display_on_trainers_list
         }
       })
     )
@@ -69,20 +90,13 @@ export async function GET(request: NextRequest) {
     // Filter out trainers not meant to be displayed
     const displayableTrainers = trainersWithUserData.filter(t => t.displayOnList)
 
-    // Check if there are more trainers
-    const totalCount = await prisma.trainer.count({ where })
+    // Total count for pagination
+    const totalCount = await prisma.users.count({ where })
     const hasMore = offset + limit < totalCount
 
-    return NextResponse.json({
-      trainers: displayableTrainers,
-      hasMore,
-      total: totalCount
-    })
+    return NextResponse.json({ trainers: displayableTrainers, hasMore, total: totalCount })
   } catch (error) {
     console.error('Failed to fetch trainers:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch trainers' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch trainers' }, { status: 500 })
   }
 }

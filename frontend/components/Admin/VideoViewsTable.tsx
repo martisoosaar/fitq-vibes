@@ -30,6 +30,12 @@ interface VideoView {
     name: string | null
     avatar: string | null
   }
+  trainer: {
+    id: number
+    name: string
+    email: string
+    slug: string
+  } | null
 }
 
 interface VideoViewsStats {
@@ -241,6 +247,7 @@ export default function VideoViewsTable() {
           <thead>
             <tr className="border-b border-[#4d5665]">
               <th className="text-left py-3 px-4 text-gray-400 font-medium">Video</th>
+              <th className="text-left py-3 px-4 text-gray-400 font-medium">Treener</th>
               <th className="text-left py-3 px-4 text-gray-400 font-medium">Kasutaja</th>
               <th className="text-left py-3 px-4 text-gray-400 font-medium">Vaadatud</th>
               <th className="text-left py-3 px-4 text-gray-400 font-medium">Progress</th>
@@ -249,16 +256,16 @@ export default function VideoViewsTable() {
           </thead>
           <tbody>
             {sortedViews.map((view) => {
-              const watchPercentage = calculateWatchPercentage(view.watchTimeSeconds, view.video.duration)
+              const watchPercentage = calculateWatchPercentage(view.watchTimeSeconds, view.video?.duration || 0)
               
               return (
                 <tr key={view.id} className="border-b border-[#4d5665] hover:bg-[#4d5665] transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      {view.video.thumbnail ? (
+                      {view.video?.thumbnail ? (
                         <img 
                           src={view.video.thumbnail} 
-                          alt={view.video.title}
+                          alt={view.video.title || 'Video'}
                           className="w-16 h-10 object-cover rounded"
                         />
                       ) : (
@@ -267,18 +274,34 @@ export default function VideoViewsTable() {
                         </div>
                       )}
                       <div>
-                        <p className="font-medium text-white">{view.video.title}</p>
+                        <p className="font-medium text-white">
+                          {view.video?.title || 'Tundmatu video'}
+                        </p>
                         <p className="text-sm text-gray-400">
-                          ID: {view.video.id}
-                          {view.video.trainer && ` • ${view.video.trainer.name}`}
+                          ID: {view.video?.id || view.videoId}
+                          {view.video?.trainer && ` • ${view.video.trainer.name}`}
                         </p>
                       </div>
                     </div>
                   </td>
                   <td className="py-3 px-4">
                     <div>
-                      <p className="text-white">{view.user.name || view.user.email}</p>
-                      <p className="text-xs text-gray-400">ID: {view.user.id}</p>
+                      <p className="text-white">
+                        {view.trainer ? view.trainer.name : 'Tundmatu treener'}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        ID: {view.trainer ? view.trainer.id : view.trainerId || 'N/A'}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div>
+                      <p className="text-white">
+                        {view.user ? (view.user.name || view.user.email) : 'Tundmatu kasutaja'}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        ID: {view.user ? view.user.id : view.userId}
+                      </p>
                     </div>
                   </td>
                   <td className="py-3 px-4">
@@ -298,12 +321,12 @@ export default function VideoViewsTable() {
                   <td className="py-3 px-4">
                     <div className="w-24">
                       <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                        <span>{getCompletionPercentage(view.playheadPosition, view.watchTimeSeconds, view.video.duration)}%</span>
+                        <span>{getCompletionPercentage(view.playheadPosition, view.watchTimeSeconds, view.video?.duration || 0)}%</span>
                       </div>
                       <div className="h-2 bg-[#2c313a] rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-[#40b236] transition-all"
-                          style={{ width: `${getCompletionPercentage(view.playheadPosition, view.watchTimeSeconds, view.video.duration)}%` }}
+                          style={{ width: `${getCompletionPercentage(view.playheadPosition, view.watchTimeSeconds, view.video?.duration || 0)}%` }}
                         />
                       </div>
                     </div>

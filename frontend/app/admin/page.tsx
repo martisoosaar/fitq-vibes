@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, UserCheck, Search, Edit, Trash2, Shield, Mail, Calendar, Activity, PlayCircle, Eye, EyeOff, Lock, Unlock, Trophy, BookOpen, RotateCcw, BarChart } from 'lucide-react'
+import { ArrowLeft, Users, UserCheck, Search, Edit, Trash2, Shield, Mail, Calendar, Activity, PlayCircle, Eye, EyeOff, Lock, Unlock, Trophy, BookOpen, RotateCcw, BarChart, Package } from 'lucide-react'
 import VideoViewsTable from '@/components/Admin/VideoViewsTable'
 
 interface User {
@@ -91,12 +91,13 @@ interface Program {
 
 export default function AdminPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'users' | 'trainers' | 'videos' | 'challenges' | 'programs' | 'video-views'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'trainers' | 'videos' | 'challenges' | 'programs' | 'products' | 'video-views'>('users')
   const [users, setUsers] = useState<User[]>([])
   const [trainers, setTrainers] = useState<Trainer[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
+  const [products, setProducts] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -123,6 +124,8 @@ export default function AdminPage() {
       fetchChallenges()
     } else if (isAdmin && activeTab === 'programs' && programs.length === 0) {
       fetchPrograms()
+    } else if (isAdmin && activeTab === 'products' && products.length === 0) {
+      fetchProducts()
     }
   }, [activeTab, isAdmin])
 
@@ -406,6 +409,22 @@ export default function AdminPage() {
     }
   }
 
+  const fetchProducts = async (search = '') => {
+    setLoading(true)
+    try {
+      const url = search ? `/api/admin/products?search=${encodeURIComponent(search)}` : '/api/admin/products'
+      const response = await fetch(url)
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data.products || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const toggleProgramStatus = async (programId: number, currentStatus: string) => {
     try {
       const newStatus = currentStatus === 'PUBLIC' ? 'DRAFT' : 'PUBLIC'
@@ -436,6 +455,22 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Failed to delete program:', error)
+    }
+  }
+
+  const deleteProduct = async (productId: number) => {
+    if (!confirm('Kas oled kindel, et soovid selle toote kustutada?')) return
+    
+    try {
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        fetchProducts()
+      }
+    } catch (error) {
+      console.error('Failed to delete product:', error)
     }
   }
 
@@ -523,6 +558,17 @@ export default function AdminPage() {
             Programmid
           </button>
           <button
+            onClick={() => setActiveTab('products')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'products'
+                ? 'bg-[#40b236] text-white'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            <Package className="w-5 h-5 inline mr-2" />
+            Tooted
+          </button>
+          <button
             onClick={() => setActiveTab('video-views')}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'video-views'
@@ -548,6 +594,7 @@ export default function AdminPage() {
                 activeTab === 'videos' ? 'Otsi videoid...' :
                 activeTab === 'challenges' ? 'Otsi väljakutseid...' :
                 activeTab === 'programs' ? 'Otsi programme...' :
+                activeTab === 'products' ? 'Otsi tooteid...' :
                 'Otsi vaatamisi...'
               }
               value={searchTerm}
@@ -572,6 +619,8 @@ export default function AdminPage() {
                     fetchChallenges(value)
                   } else if (activeTab === 'programs') {
                     fetchPrograms(value)
+                  } else if (activeTab === 'products') {
+                    fetchProducts(value)
                   }
                 }, 300) // 300ms debounce
                 
@@ -770,20 +819,20 @@ export default function AdminPage() {
               </div>
             ) : activeTab === 'trainers' ? (
               <div className="bg-[#3e4551] rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-[#2c313a]">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Nimi</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Slug</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Videod</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Vaatamisi</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Liitus</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Tegevused</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#4d5665]">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-[#2c313a]">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Nimi</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Slug</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Videod</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Vaatamisi</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Liitus</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Tegevused</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#4d5665]">
                       {trainers.map((trainer) => (
                         <tr key={trainer.id} className="hover:bg-[#4d5665] transition-colors">
                           <td className="px-4 py-3 text-sm">{trainer.id}</td>
@@ -1058,6 +1107,87 @@ export default function AdminPage() {
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : activeTab === 'products' ? (
+              <div className="bg-[#3e4551] rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[#2c313a]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Nimi</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Treener</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Tüüp</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Hind</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Kehtivus</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Loodud</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Tegevused</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#4d5665]">
+                      {products.map((product) => (
+                        <tr key={product.id} className="hover:bg-[#4d5665] transition-colors">
+                          <td className="px-4 py-3 text-sm">{product.id}</td>
+                          <td className="px-4 py-3 text-sm font-medium">
+                            <div className="max-w-xs truncate" title={product.name}>
+                              {product.name}
+                            </div>
+                            {product.description && (
+                              <div className="text-xs text-gray-400 truncate max-w-xs" title={product.description}>
+                                {product.description}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {product.trainer ? (
+                              <div>
+                                <div className="font-medium">{product.trainer.name}</div>
+                                <div className="text-xs text-gray-400">{product.trainer.email}</div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              product.type === 'TRAINER_TICKET' ? 'bg-blue-500 text-white' :
+                              product.type === 'TRAINER_PROGRAM' ? 'bg-green-500 text-white' :
+                              product.type === 'TRAINER_SUBSCRIPTION' ? 'bg-purple-500 text-white' :
+                              'bg-gray-500 text-white'
+                            }`}>
+                              {product.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {product.price} {product.currency}
+                            {product.discounted_price && (
+                              <div className="text-xs text-green-400">
+                                Soodushind: {product.discounted_price}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {product.expires_in_days > 0 ? `${product.expires_in_days} päeva` :
+                             product.contract_length_in_months ? `${product.contract_length_in_months} kuud` :
+                             'Tähtajatu'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-400">
+                            {product.created_at ? new Date(product.created_at).toLocaleDateString('et-EE') : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            <button
+                              onClick={() => deleteProduct(product.id)}
+                              className="p-1 bg-red-500 hover:bg-red-600 rounded"
+                              title="Kustuta"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}

@@ -44,7 +44,7 @@ export default function ChallengesPage() {
       const response = await fetch('/api/challenges')
       if (response.ok) {
         const data = await response.json()
-        setChallenges(data)
+        setChallenges(data.challenges || data)
       } else {
         console.error('Failed to fetch challenges')
       }
@@ -67,24 +67,24 @@ export default function ChallengesPage() {
   const now = new Date()
   
   // Filter challenges by status
-  const activeChallenges = challenges.filter(c => {
+  const activeChallenges = Array.isArray(challenges) ? challenges.filter(c => {
     if (!c.beginDate || !c.endDate) return true // No dates means always active
     const begin = new Date(c.beginDate)
     const end = new Date(c.endDate)
     return begin <= now && end >= now
-  })
+  }) : []
   
-  const upcomingChallenges = challenges.filter(c => {
+  const upcomingChallenges = Array.isArray(challenges) ? challenges.filter(c => {
     if (!c.beginDate) return false
     const begin = new Date(c.beginDate)
     return begin > now
-  })
+  }) : []
   
-  const endedChallenges = challenges.filter(c => {
+  const endedChallenges = Array.isArray(challenges) ? challenges.filter(c => {
     if (!c.endDate) return false
     const end = new Date(c.endDate)
     return end < now
-  })
+  }) : []
 
   const displayedChallenges = 
     activeTab === 'active' ? activeChallenges :

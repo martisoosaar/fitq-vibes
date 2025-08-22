@@ -7,661 +7,1696 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model UserFollow {
-  id          Int      @id @default(autoincrement())
-  followerId  Int // The user who is following
-  followingId Int // The user being followed
-  status      String   @default("active") // active, pending (for non-trainers), blocked
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  follower  User @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
-  @@map("user_follows")
-}
-
 model UserNotification {
-  id        Int       @id @default(autoincrement())
-  userId    Int // User who receives the notification
-  type      String // follow_request, follow_accepted, new_follower, etc.
-  title     String
-  message   String    @db.Text
-  data      Json? // Additional data like followerId, videoId, etc.
-  isRead    Boolean   @default(false)
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  id                Int      @id @default(autoincrement())
+  user_id           Int
+  notification_text String   @db.Text
+  watched           Int      @default(0) @db.SmallInt
+  link              String?  @db.Text
+  created_at        DateTime @default(now()) @db.Timestamp(0)
+  updated_at        DateTime @default(now()) @db.Timestamp(0)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead])
   @@map("user_notifications")
 }
 
-model TrainerTestimonial {
-  id         Int      @id @default(autoincrement())
-  trainerId  Int      // The trainer being reviewed
-  userId     Int      // The user who wrote the testimonial
-  rating     Int      // Rating from 1 to 5
-  comment    String   @db.Text
-  isApproved Boolean  @default(true) // For moderation if needed
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([trainerId, isApproved])
-  @@index([userId])
-  @@map("trainer_testimonials")
-}
-
 model TrainerSocialLink {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique @map("user_id")
-  facebookLink  String?  @map("facebook_link") @db.Text
-  youtubeLink   String?  @map("youtube_link") @db.Text
-  instagramLink String?  @map("instagram_link") @db.Text
-  tiktokLink    String?  @map("tiktok_link") @db.Text
-  twitterLink   String?  @map("twitter_link") @db.Text
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  trainer Trainer @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            Int       @id @default(autoincrement())
+  userId        String    @map("user_id") @db.Text
+  facebookLink  String?   @map("facebook_link") @db.Text
+  youtubeLink   String?   @map("youtube_link") @db.Text
+  instagramLink String?   @map("instagram_link") @db.Text
+  tiktokLink    String?   @map("tiktok_link") @db.Text
+  twitterLink   String?   @map("twitter_link") @db.Text
+  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@map("trainer_social_links")
 }
 
-model User {
-  id                                Int                  @id @default(autoincrement())
-  email                             String               @unique
-  name                              String?
-  createdAt                         DateTime             @default(now())
-  updatedAt                         DateTime             @updatedAt
-  deletedAt                         DateTime?            @map("deleted_at")
-  agoraId                           String?
-  avatar                            String?              @default("users/default.png")
-  biographyImage                    String?              @db.Text
-  birthday                          DateTime?
-  commentEmailNotifications         Int                  @default(1) @db.TinyInt
-  country                           String?              @db.Text
-  displayOnTrainersList             Int                  @default(0) @db.TinyInt
-  emailVerifiedAt                   DateTime?
-  externalAvatar                    String?              @db.Text
-  facebookId                        String?
-  feePercentage                     Int?                 @default(0)
-  getresponseTags                   String?
-  googleId                          String?
-  gymwolfSession                    String?
-  height                            Int?
-  hideNameFromLeaderboards          Int?                 @db.TinyInt
-  languageId                        Int?                 @default(1)
-  lastLogin                         DateTime?
-  linkOgImage                       String?
-  monthlyNews                       Int                  @default(1) @db.SmallInt
-  notifications                     String?              @db.Text
-  profileDesc                       String?              @db.Text
-  profilePic                        String?              @db.Text
-  programUnitInfoEmailNotifications Int                  @default(1) @db.TinyInt
-  rememberToken                     String?              @db.Text
-  roleId                            Int?
-  sex                               String?
-  showIntro                         Int?                 @default(1) @db.TinyInt
-  simpleLink                        String?
-  sportIdAssessToken                String?              @db.Text
-  sportIdEmail                      String?
-  sportIdId                         String?
-  sportIdRefreshToken               String?              @db.Text
-  timezone                          String?
-  totalVideoViews                   Int                  @default(0)
-  trainerChannelImage               String?
-  trainerIframeIntro                String?              @db.Text
-  trainerNotification               String?              @db.Text
-  trainerUnlocked                   Int?                 @db.TinyInt @map("trainer_unlocked")
-  trainerWelcomeDesc                String?              @db.Text
-  trainerWelcomeTitle               String?
-  trialEnd                          Int?                 @db.SmallInt
-  userCredit                        Float                @default(0)
-  userFirstBuy                      Int                  @default(0) @db.TinyInt
-  userInvitedBy                     Int                  @default(0)
-  userLanguage                      Int?
-  utmData                           String?              @db.Text
-  wallet                            Decimal              @default(0.00000) @db.Decimal(10, 5)
-  weeklyNews                        Int                  @default(1) @db.SmallInt
-  weight                            Int?
-  isAdmin                           Boolean              @default(false)
-  sessions                          DeviceSession[]
-  tokens                            RefreshToken[]
-  videos                            Video[]
-  videoViews                        VideoView[]
-  videoComments                     VideoComment[]
-  videoCommentLikes                 VideoCommentLike[]
-  trainedVideos                     VideoTrainer[]       @relation("TrainerVideos")
-  followers                         UserFollow[]         @relation("UserFollowing")
-  following                         UserFollow[]         @relation("UserFollowers")
-  userNotifications                 UserNotification[]
-  challenges                        Challenge[]
-  trainerPrograms                   TrainerProgram[]     @relation("TrainerPrograms")
-  programUsers                      TrainerProgramUser[] @relation("ProgramUsers")
-  adminImpersonations               ImpersonationToken[] @relation("AdminTokens")
-  impersonatedSessions              ImpersonationToken[] @relation("ImpersonatedTokens")
-  testimonials                      TrainerTestimonial[]
-}
-
-model LoginCode {
-  id          Int       @id @default(autoincrement())
-  email       String
-  challengeId String    @unique
-  codeHash    String
-  expiresAt   DateTime
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(5)
-  consumedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-model DeviceSession {
-  id         Int            @id @default(autoincrement())
-  userId     Int
-  deviceName String?
-  ip         String?
-  ua         String?
-  lastUsedAt DateTime?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokens     RefreshToken[]
-
-  @@index([userId], map: "DeviceSession_userId_fkey")
-}
-
-model RefreshToken {
-  id              Int           @id @default(autoincrement())
-  userId          Int
-  deviceSessionId Int
-  tokenHash       String        @unique
-  revokedAt       DateTime?
-  expiresAt       DateTime
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  deviceSession   DeviceSession @relation(fields: [deviceSessionId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([deviceSessionId], map: "RefreshToken_deviceSessionId_fkey")
-  @@index([userId], map: "RefreshToken_userId_fkey")
-}
-
-model Trainer {
-  id            Int                  @id @default(autoincrement())
-  slug          String               @unique
-  name          String
-  avatar        String?
-  videosCount   Int                  @default(0)
-  videoViews    Int                  @default(0)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  programs      Program[]
-  videos        Video[]
-  videoViewsLog VideoView[]
-  testimonials  TrainerTestimonial[]
-  socialLinks   TrainerSocialLink?
-}
-
-model Language {
-  id             Int       @id @default(autoincrement())
-  languageName   String
-  languageNative String?
-  languageAbbr   String    @unique
-  languageFlag   String?
-  createdAt      DateTime? @default(now())
-  updatedAt      DateTime  @default(now()) @updatedAt
-  videos         Video[]
-}
-
-model VideoCategory {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique(map: "name")
-  image     String?   @db.VarChar(255)
-  createdAt DateTime? @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
-  videos    Video[]
-}
-
 model VideoTrainer {
-  id        Int       @id @default(autoincrement())
-  videoId   Int
-  trainerId Int
-  createdAt DateTime? @default(now())
-  updatedAt DateTime? @updatedAt
-  deletedAt DateTime?
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  video_id   Int
+  trainer_id BigInt    @db.UnsignedBigInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+  users      users     @relation(fields: [trainer_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "video_trainers_trainer_id_foreign")
+  videos     videos    @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "video_trainers_video_id_foreign")
 
-  video   Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  trainer User  @relation("TrainerVideos", fields: [trainerId], references: [id], onDelete: Cascade)
-
-  @@index([videoId])
-  @@index([trainerId])
+  @@index([trainer_id], map: "video_trainers_trainer_id_index")
+  @@index([video_id], map: "video_trainers_video_id_index")
   @@map("video_trainers")
 }
 
-model Video {
-  id                   Int                               @id @default(autoincrement())
-  userId               Int
-  title                String                            @db.Text
-  description          String                            @db.Text
-  duration             Int
-  categoryId           Int
-  languageId           Int?
-  equipment            String?                           @db.Text
-  energyConsumption    Int?                              @default(0)
-  keywords             String?                           @db.Text
-  live                 Boolean?                          @default(false)
-  onDemand             Boolean?                          @default(true)
-  recommend            Int?                              @db.TinyInt
-  startTime            DateTime?                         @db.DateTime(0)
-  endTime              DateTime?                         @db.DateTime(0)
-  availableFrom        DateTime?                         @db.DateTime(0)
-  availableUntil       DateTime?                         @db.DateTime(0)
-  openForSubscribers   Boolean?                          @default(false)
-  openForTickets       Boolean?                          @default(false)
-  openForFree          Boolean?                          @default(false)
-  singleTicketPrice    Float?                            @default(0) @db.Float
-  iframe               String?                           @db.Text
-  videoPreview         String?                           @db.Text
-  videoPreviewExternal String?                           @db.Text
-  videoLanguage        String?                           @db.VarChar(255)
-  videoPlatform        String?                           @db.Text
-  playbackUrl          String?                           @db.Text
-  vimeoId              String?                           @db.VarChar(255)
-  recordId             String?                           @db.VarChar(255)
-  hidden               Boolean?                          @default(false)
-  hiddenHash           String?                           @db.VarChar(255)
-  videoDeleted         Boolean?                          @default(false)
-  unlisted             String?                           @db.VarChar(255)
-  reportedBad          Boolean?                          @default(false)
-  videoTest            Boolean?                          @default(false)
-  videoForChallenge    Int?                              @default(0)
-  views                Int?                              @default(0)
-  trainerId            Int?
-  createdAt            DateTime?                         @default(now())
-  updatedAt            DateTime                          @default(now()) @updatedAt
-  deletedAt            DateTime?                         @map("deleted_at")
-  user                 User                              @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "video_ibfk_1")
-  category             VideoCategory                     @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "video_ibfk_2")
-  trainer              Trainer?                          @relation(fields: [trainerId], references: [id], onUpdate: NoAction, map: "video_ibfk_3")
-  language             Language?                         @relation(fields: [languageId], references: [id], onUpdate: NoAction, map: "video_ibfk_4")
-  viewsLog             VideoView[]
-  comments             VideoComment[]
-  trainers             VideoTrainer[]
-  musicCopyrights      VideoMusicCopyright[]
-  programUnitMaterials TrainerProgramUnitVideoMaterial[]
-  programVideoTasks    TrainerProgramUnitVideoTask[]     @relation("ProgramVideoTasks")
-  programIntros        TrainerProgram[]                   @relation("ProgramIntroVideos")
-
-  @@index([categoryId], map: "categoryId")
-  @@index([trainerId], map: "trainerId")
-  @@index([userId], map: "userId")
-  @@index([languageId], map: "languageId")
-}
-
-model VideoView {
-  id                    Int      @id @default(autoincrement())
-  videoId               Int
-  userId                Int
-  trainerId             Int?
-  watchTimeSeconds      Int      @default(0)
-  playheadPosition      Float    @default(0) // Current position in the video (seconds)
-  stillWatching         Boolean  @default(true) // Is the viewing session still active
-  caloriesBurned        Int?
-  paid                  Boolean  @default(false)
-  userCash              Float    @default(0.000)
-  trainerCash           Float    @default(0.000)
-  currentlyWatchingLive Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  video   Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trainer Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-
-  @@index([videoId], map: "videoId")
-  @@index([userId], map: "userId")
-  @@index([trainerId], map: "trainerId")
-  @@index([stillWatching], map: "stillWatching")
-}
-
-model ImpersonationToken {
-  id             Int      @id @default(autoincrement())
-  token          String   @unique @db.VarChar(255)
-  adminId        Int      @map("admin_id")
-  impersonatedId Int      @map("impersonated_id")
-  expiresAt      DateTime @map("expires_at")
-  usedAt         DateTime? @map("used_at")
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  admin        User @relation("AdminTokens", fields: [adminId], references: [id], onDelete: Cascade)
-  impersonated User @relation("ImpersonatedTokens", fields: [impersonatedId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([adminId])
-  @@index([impersonatedId])
-  @@map("impersonation_tokens")
-}
-
 model VideoMusicCopyright {
-  id        Int       @id @default(autoincrement())
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   videoId   Int       @map("video_id")
   title     String    @db.VarChar(128)
   artist    String    @db.VarChar(128)
   data      String?   @db.Text
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(0)
 
-  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
-
-  @@index([videoId])
+  @@index([videoId], map: "video_music_copyrights_video_id_index")
   @@map("video_music_copyrights")
 }
 
-model VideoComment {
-  id        Int       @id @default(autoincrement())
-  videoId   Int
-  userId    Int
-  parentId  Int?
-  content   String    @db.Text
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  video   Video              @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent  VideoComment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies VideoComment[]     @relation("CommentReplies")
-  likes   VideoCommentLike[]
-
-  @@index([videoId], map: "VideoComment_videoId_fkey")
-  @@index([userId], map: "VideoComment_userId_fkey")
-  @@index([parentId], map: "VideoComment_parentId_fkey")
-}
-
-model VideoCommentLike {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  commentId Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comment VideoComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, commentId])
-  @@index([commentId], map: "VideoCommentLike_commentId_fkey")
-  @@index([userId], map: "VideoCommentLike_userId_fkey")
-}
-
-model Program {
-  id               Int      @id @default(autoincrement())
-  hashId           String   @unique
-  title            String
-  shortDescription String
-  picture          String
-  urlSlug          String   @unique
-  trainerId        Int
-  unitsCount       Int      @default(0)
-  canAccess        Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  trainer          Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-
-  @@index([trainerId], map: "Program_trainerId_fkey")
-}
-
 model Challenge {
-  id                   Int       @id @default(autoincrement())
-  name                 String?   @db.VarChar(255)
-  description          String?   @db.Text
-  image                String    @db.VarChar(500)
-  content              String    @db.Text
-  slides               String    @db.Text
-  includes             String    @db.Text
-  commune              String    @db.Text
-  type                 String?   @db.VarChar(255)
-  isSubscriptionNeeded Int       @default(0) @db.TinyInt
-  path                 String?   @db.VarChar(255)
-  beginDate            DateTime? @db.Timestamp(0)
-  endDate              DateTime? @db.Timestamp(0)
-  userId               Int?
-  minTeam              Int?
-  maxTeam              Int?
-  challengeVisible     Int       @default(1) @db.TinyInt
-  createdAt            DateTime? @db.Timestamp(0)
-  updatedAt            DateTime  @default(now()) @updatedAt
-  deletedAt            DateTime? @db.Timestamp(0)
+  id                     Int       @id @default(autoincrement())
+  name                   String?   @db.VarChar(255)
+  description            String?   @db.Text
+  image                  String    @db.VarChar(500)
+  content                String    @db.Text
+  slides                 String    @db.Text
+  includes               String    @db.Text
+  commune                String    @db.Text
+  type                   String?   @db.VarChar(255)
+  is_subscription_needed Int       @default(0) @db.TinyInt
+  path                   String?   @db.VarChar(255)
+  begin_date             DateTime? @db.Timestamp(0)
+  end_date               DateTime? @db.Timestamp(0)
+  user_id                Int?
+  min_team               Int?
+  max_team               Int?
+  challenge_visible      Int       @default(1) @db.TinyInt
+  created_at             DateTime? @db.Timestamp(0)
+  updated_at             DateTime  @default(now()) @db.Timestamp(0)
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([challengeVisible])
   @@map("challenges")
 }
 
 model TrainerProgram {
-  id               BigInt    @id @default(autoincrement())
-  trainerId        Int
-  title            String    @db.VarChar(255)
-  shortDescription String    @db.Text
-  description      String    @db.Text
-  picture          String?   @db.VarChar(500)
-  urlSlug          String?   @db.VarChar(255)
-  faq              String?   @db.Text
-  unitLength       String    @default("DAY") @db.VarChar(16)
-  unitVisibility   String    @default("VISIBLE_AFTER_PREVIOUS") @db.VarChar(255)
-  languageId       Int       @db.TinyInt
-  status           String    @default("DRAFT") @db.VarChar(16)
-  commentsEnabled  Boolean   @default(false)
-  feedbackEnabled  Boolean   @default(false)
-  introVideoId     Int?      @map("intro_video_id")
-  createdAt        DateTime? @db.Timestamp(0)
-  updatedAt        DateTime? @db.Timestamp(0)
-  deletedAt        DateTime? @db.Timestamp(0)
+  id                                  BigInt                                @id @default(autoincrement()) @db.UnsignedBigInt
+  trainer_id                          Int
+  title                               String                                @db.VarChar(255)
+  short_description                   String                                @db.Text
+  description                         String                                @db.Text
+  picture                             String?                               @db.VarChar(500)
+  url_slug                            String?                               @db.VarChar(255)
+  faq                                 String?                               @db.Text
+  unit_length                         String                                @default("DAY") @db.VarChar(16)
+  unit_visibility                     String                                @default("VISIBLE_AFTER_PREVIOUS") @db.VarChar(255)
+  language_id                         Int                                   @db.TinyInt
+  status                              String                                @default("DRAFT") @db.VarChar(16)
+  comments_enabled                    Boolean                               @default(false)
+  feedback_enabled                    Boolean                               @default(false)
+  created_at                          DateTime?                             @db.Timestamp(0)
+  updated_at                          DateTime?                             @db.Timestamp(0)
+  deleted_at                          DateTime?                             @db.Timestamp(0)
+  trainer_program_access              trainer_program_access[]
+  trainer_program_associated_products trainer_program_associated_products[]
+  trainer_program_intro_videos        trainer_program_intro_videos[]
+  trainer_program_moderators          trainer_program_moderators[]
+  trainer_program_units               TrainerProgramUnit[]
+  trainer_program_user_unit_done      TrainerProgramUserUnitDone[]
+  trainer_program_users               TrainerProgramUser[]
 
-  trainer    User                 @relation("TrainerPrograms", fields: [trainerId], references: [id])
-  introVideo Video?               @relation("ProgramIntroVideos", fields: [introVideoId], references: [id])
-  units      TrainerProgramUnit[]
-  users      TrainerProgramUser[]
-
-  @@index([trainerId])
-  @@index([status])
-  @@index([introVideoId])
   @@map("trainer_programs")
 }
 
 model TrainerProgramUnit {
-  id          BigInt    @id @default(autoincrement())
-  programId   BigInt
-  order       Int?
-  title       String    @db.VarChar(255)
-  description String?   @db.Text
-  status      String    @default("DRAFT") @db.VarChar(255)
-  createdAt   DateTime? @db.Timestamp(0)
-  updatedAt   DateTime? @db.Timestamp(0)
-  deletedAt   DateTime? @db.Timestamp(0)
+  id                                          BigInt                                  @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id                                  BigInt                                  @db.UnsignedBigInt
+  order                                       Int?
+  title                                       String                                  @db.VarChar(255)
+  description                                 String?                                 @db.Text
+  status                                      String                                  @default("DRAFT") @db.VarChar(255)
+  created_at                                  DateTime?                               @db.Timestamp(0)
+  updated_at                                  DateTime?                               @db.Timestamp(0)
+  deleted_at                                  DateTime?                               @db.Timestamp(0)
+  trainer_program_unit_cardio_template_tasks  TrainerProgramUnitCardioTemplateTask[]
+  trainer_program_unit_files                  TrainerProgramUnitFile[]
+  trainer_program_unit_text_tasks             TrainerProgramUnitTextTask[]
+  trainer_program_unit_video_materials        TrainerProgramUnitVideoMaterial[]
+  trainer_program_unit_video_tasks            TrainerProgramUnitVideoTask[]
+  trainer_program_unit_workout_template_tasks TrainerProgramUnitWorkoutTemplateTask[]
+  trainer_programs                            TrainerProgram                          @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_units_program_id_foreign")
+  trainer_program_user_unit_done              TrainerProgramUserUnitDone[]
 
-  program        TrainerProgram                          @relation(fields: [programId], references: [id])
-  videoMaterials TrainerProgramUnitVideoMaterial[]
-  textTasks      TrainerProgramUnitTextTask[]
-  videoTasks     TrainerProgramUnitVideoTask[]
-  files          TrainerProgramUnitFile[]
-  workoutTasks   TrainerProgramUnitWorkoutTemplateTask[]
-  cardioTasks    TrainerProgramUnitCardioTemplateTask[]
-  unitsDone      TrainerProgramUserUnitDone[]
-
-  @@index([programId])
+  @@index([program_id], map: "trainer_program_units_program_id_index")
   @@map("trainer_program_units")
 }
 
 model TrainerProgramUnitVideoMaterial {
-  id        BigInt    @id @default(autoincrement())
-  unitId    BigInt
-  videoId   Int
-  createdAt DateTime? @db.Timestamp(0)
-  updatedAt DateTime? @db.Timestamp(0)
-  deletedAt DateTime? @db.Timestamp(0)
+  id                    BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  unit_id               BigInt             @db.UnsignedBigInt
+  video_id              Int
+  created_at            DateTime?          @db.Timestamp(0)
+  updated_at            DateTime?          @db.Timestamp(0)
+  deleted_at            DateTime?          @db.Timestamp(0)
+  trainer_program_units TrainerProgramUnit @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_video_materials_unit_id_foreign")
+  videos                videos             @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_video_materials_video_id_foreign")
 
-  unit  TrainerProgramUnit @relation(fields: [unitId], references: [id])
-  video Video              @relation(fields: [videoId], references: [id])
-
-  @@index([unitId])
-  @@index([videoId])
+  @@index([unit_id], map: "trainer_program_unit_video_materials_unit_id_index")
+  @@index([video_id], map: "trainer_program_unit_video_materials_video_id_index")
   @@map("trainer_program_unit_video_materials")
 }
 
 model TrainerProgramUnitTextTask {
-  id          BigInt    @id @default(autoincrement())
-  unitId      BigInt
-  order       Int?
-  title       String    @db.VarChar(255)
-  description String?   @db.Text
-  createdAt   DateTime? @db.Timestamp(0)
-  updatedAt   DateTime? @db.Timestamp(0)
-  deletedAt   DateTime? @db.Timestamp(0)
+  id                              BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  unit_id                         BigInt                       @db.UnsignedBigInt
+  order                           Int?
+  content                         String                       @db.Text
+  created_at                      DateTime?                    @db.Timestamp(0)
+  updated_at                      DateTime?                    @db.Timestamp(0)
+  deleted_at                      DateTime?                    @db.Timestamp(0)
+  trainer_program_units           TrainerProgramUnit           @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_text_tasks_unit_id_foreign")
+  trainer_program_user_tasks_done TrainerProgramUserTaskDone[]
 
-  unit      TrainerProgramUnit           @relation(fields: [unitId], references: [id])
-  tasksDone TrainerProgramUserTaskDone[]
-
-  @@index([unitId])
+  @@index([unit_id], map: "trainer_program_unit_text_tasks_unit_id_index")
   @@map("trainer_program_unit_text_tasks")
 }
 
 model TrainerProgramUnitVideoTask {
-  id        BigInt    @id @default(autoincrement())
-  unitId    BigInt
-  videoId   Int
-  order     Int?
-  createdAt DateTime? @db.Timestamp(0)
-  updatedAt DateTime? @db.Timestamp(0)
-  deletedAt DateTime? @db.Timestamp(0)
+  id                              BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  unit_id                         BigInt                       @db.UnsignedBigInt
+  order                           Int?
+  video_id                        Int
+  created_at                      DateTime?                    @db.Timestamp(0)
+  updated_at                      DateTime?                    @db.Timestamp(0)
+  deleted_at                      DateTime?                    @db.Timestamp(0)
+  trainer_program_units           TrainerProgramUnit           @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_video_tasks_unit_id_foreign")
+  videos                          videos                       @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_video_tasks_video_id_foreign")
+  trainer_program_user_tasks_done TrainerProgramUserTaskDone[]
 
-  unit      TrainerProgramUnit           @relation(fields: [unitId], references: [id])
-  video     Video                        @relation("ProgramVideoTasks", fields: [videoId], references: [id])
-  tasksDone TrainerProgramUserTaskDone[]
-
-  @@index([unitId])
-  @@index([videoId])
+  @@index([unit_id], map: "trainer_program_unit_video_tasks_unit_id_index")
+  @@index([video_id], map: "trainer_program_unit_video_tasks_video_id_index")
   @@map("trainer_program_unit_video_tasks")
 }
 
 model TrainerProgramUnitFile {
-  id        BigInt    @id @default(autoincrement())
-  unitId    BigInt
-  order     Int?
-  title     String    @db.VarChar(255)
-  file      String    @db.VarChar(500)
-  createdAt DateTime? @db.Timestamp(0)
-  updatedAt DateTime? @db.Timestamp(0)
-  deletedAt DateTime? @db.Timestamp(0)
+  id                    BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  unit_id               BigInt             @db.UnsignedBigInt
+  file_url              String             @db.VarChar(500)
+  title                 String?            @db.VarChar(255)
+  created_at            DateTime?          @db.Timestamp(0)
+  updated_at            DateTime?          @db.Timestamp(0)
+  deleted_at            DateTime?          @db.Timestamp(0)
+  trainer_program_units TrainerProgramUnit @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_files_unit_id_foreign")
 
-  unit TrainerProgramUnit @relation(fields: [unitId], references: [id])
-
-  @@index([unitId])
+  @@index([unit_id], map: "trainer_program_unit_files_unit_id_index")
   @@map("trainer_program_unit_files")
 }
 
 model TrainerProgramUnitWorkoutTemplateTask {
-  id                BigInt    @id @default(autoincrement())
-  unitId            BigInt
-  order             Int?
-  title             String    @db.VarChar(255)
-  workoutTemplateId Int
-  createdAt         DateTime? @db.Timestamp(0)
-  updatedAt         DateTime? @db.Timestamp(0)
-  deletedAt         DateTime? @db.Timestamp(0)
+  id                              BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  unit_id                         BigInt                       @db.UnsignedBigInt
+  order                           Int?
+  gymwolf_id                      BigInt                       @db.UnsignedBigInt
+  created_at                      DateTime?                    @db.Timestamp(0)
+  updated_at                      DateTime?                    @db.Timestamp(0)
+  deleted_at                      DateTime?                    @db.Timestamp(0)
+  trainer_program_units           TrainerProgramUnit           @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_workout_template_tasks_unit_id_foreign")
+  trainer_program_user_tasks_done TrainerProgramUserTaskDone[]
 
-  unit      TrainerProgramUnit           @relation(fields: [unitId], references: [id])
-  tasksDone TrainerProgramUserTaskDone[]
-
-  @@index([unitId])
+  @@index([gymwolf_id], map: "trainer_program_unit_workout_template_tasks_gymwolf_id_index")
+  @@index([unit_id], map: "trainer_program_unit_workout_template_tasks_unit_id_index")
   @@map("trainer_program_unit_workout_template_tasks")
 }
 
 model TrainerProgramUnitCardioTemplateTask {
-  id               BigInt    @id @default(autoincrement())
-  unitId           BigInt
-  order            Int?
-  title            String    @db.VarChar(255)
-  cardioTemplateId Int
-  createdAt        DateTime? @db.Timestamp(0)
-  updatedAt        DateTime? @db.Timestamp(0)
-  deletedAt        DateTime? @db.Timestamp(0)
+  id                              BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  unit_id                         BigInt                       @db.UnsignedBigInt
+  order                           Int?
+  gymwolf_id                      BigInt                       @db.UnsignedBigInt
+  created_at                      DateTime?                    @db.Timestamp(0)
+  updated_at                      DateTime?                    @db.Timestamp(0)
+  deleted_at                      DateTime?                    @db.Timestamp(0)
+  trainer_program_units           TrainerProgramUnit           @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_unit_cardio_template_tasks_unit_id_foreign")
+  trainer_program_user_tasks_done TrainerProgramUserTaskDone[]
 
-  unit      TrainerProgramUnit           @relation(fields: [unitId], references: [id])
-  tasksDone TrainerProgramUserTaskDone[]
-
-  @@index([unitId])
+  @@index([gymwolf_id], map: "trainer_program_unit_cardio_template_tasks_gymwolf_id_index")
+  @@index([unit_id], map: "trainer_program_unit_cardio_template_tasks_unit_id_index")
   @@map("trainer_program_unit_cardio_template_tasks")
 }
 
 model TrainerProgramUser {
-  id          BigInt    @id @default(autoincrement())
-  programId   BigInt
-  userId      Int
-  startDate   DateTime? @db.Date
-  status      String    @default("ACTIVE") @db.VarChar(16)
-  currentUnit Int?
-  createdAt   DateTime? @db.Timestamp(0)
-  updatedAt   DateTime? @db.Timestamp(0)
-  deletedAt   DateTime? @db.Timestamp(0)
+  id                              BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id                      BigInt                       @db.UnsignedBigInt
+  user_id                         BigInt                       @db.UnsignedBigInt
+  status                          String                       @default("STATUS_IN_PROGRESS") @db.VarChar(32)
+  created_at                      DateTime?                    @db.Timestamp(0)
+  updated_at                      DateTime?                    @db.Timestamp(0)
+  deleted_at                      DateTime?                    @db.Timestamp(0)
+  trainer_program_user_tasks_done TrainerProgramUserTaskDone[]
+  trainer_program_user_unit_done  TrainerProgramUserUnitDone[]
+  trainer_programs                TrainerProgram               @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_users_program_id_foreign")
+  users                           users                        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_users_user_id_foreign")
 
-  program   TrainerProgram               @relation(fields: [programId], references: [id])
-  user      User                         @relation("ProgramUsers", fields: [userId], references: [id])
-  unitsDone TrainerProgramUserUnitDone[]
-  tasksDone TrainerProgramUserTaskDone[]
-
-  @@unique([programId, userId])
-  @@index([programId])
-  @@index([userId])
+  @@index([program_id], map: "trainer_program_users_program_id_index")
+  @@index([user_id], map: "trainer_program_users_user_id_index")
   @@map("trainer_program_users")
 }
 
 model TrainerProgramUserUnitDone {
-  id            BigInt    @id @default(autoincrement())
-  programUserId BigInt
-  unitId        BigInt
-  completedAt   DateTime? @db.Timestamp(0)
-  createdAt     DateTime? @db.Timestamp(0)
-  updatedAt     DateTime? @db.Timestamp(0)
+  id                      BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id              BigInt             @db.UnsignedBigInt
+  trainer_program_user_id BigInt             @db.UnsignedBigInt
+  unit_id                 BigInt             @db.UnsignedBigInt
+  created_at              DateTime?          @db.Timestamp(0)
+  updated_at              DateTime?          @db.Timestamp(0)
+  deleted_at              DateTime?          @db.Timestamp(0)
+  trainer_programs        TrainerProgram     @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_unit_done_program_id_foreign")
+  trainer_program_users   TrainerProgramUser @relation(fields: [trainer_program_user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_unit_done_trainer_program_user_id_foreign")
+  trainer_program_units   TrainerProgramUnit @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_unit_done_unit_id_foreign")
 
-  programUser TrainerProgramUser @relation(fields: [programUserId], references: [id])
-  unit        TrainerProgramUnit @relation(fields: [unitId], references: [id])
-
-  @@unique([programUserId, unitId])
-  @@index([programUserId])
-  @@index([unitId])
+  @@index([program_id], map: "trainer_program_user_unit_done_program_id_foreign")
+  @@index([trainer_program_user_id], map: "trainer_program_user_unit_done_trainer_program_user_id_foreign")
+  @@index([unit_id], map: "trainer_program_user_unit_done_unit_id_foreign")
   @@map("trainer_program_user_unit_done")
 }
 
 model TrainerProgramUserTaskDone {
-  id            BigInt    @id @default(autoincrement())
-  programUserId BigInt
-  taskType      String    @db.VarChar(50) // 'text', 'video', 'workout_template', 'cardio_template'
-  taskId        BigInt
-  workoutId     Int? // For workout templates - reference to user's workout
-  completedAt   DateTime? @db.Timestamp(0)
-  createdAt     DateTime? @db.Timestamp(0)
-  updatedAt     DateTime? @db.Timestamp(0)
+  id                                          BigInt                                 @id @default(autoincrement()) @db.UnsignedBigInt
+  program_user_id                             BigInt                                 @db.UnsignedBigInt
+  text_task_id                                BigInt?                                @db.UnsignedBigInt
+  video_task_id                               BigInt?                                @db.UnsignedBigInt
+  workout_template_task_id                    BigInt?                                @db.UnsignedBigInt
+  cardio_template_task_id                     BigInt?                                @db.UnsignedBigInt
+  gymwolf_workout_id                          BigInt?                                @db.UnsignedBigInt
+  created_at                                  DateTime?                              @db.Timestamp(0)
+  updated_at                                  DateTime?                              @db.Timestamp(0)
+  deleted_at                                  DateTime?                              @db.Timestamp(0)
+  trainer_program_unit_cardio_template_tasks  TrainerProgramUnitCardioTemplateTask?  @relation(fields: [cardio_template_task_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_tasks_done_cardio_template_task_id_foreign")
+  trainer_program_users                       TrainerProgramUser                     @relation(fields: [program_user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_tasks_done_program_user_id_foreign")
+  trainer_program_unit_text_tasks             TrainerProgramUnitTextTask?            @relation(fields: [text_task_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_tasks_done_text_task_id_foreign")
+  trainer_program_unit_video_tasks            TrainerProgramUnitVideoTask?           @relation(fields: [video_task_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_tasks_done_video_task_id_foreign")
+  trainer_program_unit_workout_template_tasks TrainerProgramUnitWorkoutTemplateTask? @relation(fields: [workout_template_task_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_user_tasks_done_workout_template_task_id_foreign")
 
-  programUser TrainerProgramUser                     @relation(fields: [programUserId], references: [id])
-  textTask    TrainerProgramUnitTextTask?            @relation(fields: [taskId], references: [id], map: "trainer_program_user_tasks_done_textTaskId_fkey")
-  videoTask   TrainerProgramUnitVideoTask?           @relation(fields: [taskId], references: [id], map: "trainer_program_user_tasks_done_videoTaskId_fkey")
-  workoutTask TrainerProgramUnitWorkoutTemplateTask? @relation(fields: [taskId], references: [id], map: "trainer_program_user_tasks_done_workoutTaskId_fkey")
-  cardioTask  TrainerProgramUnitCardioTemplateTask?  @relation(fields: [taskId], references: [id], map: "trainer_program_user_tasks_done_cardioTaskId_fkey")
-
-  @@unique([programUserId, taskType, taskId])
-  @@index([programUserId])
-  @@index([taskType, taskId])
+  @@index([cardio_template_task_id], map: "trainer_program_user_tasks_done_cardio_template_task_id_index")
+  @@index([gymwolf_workout_id], map: "trainer_program_user_tasks_done_gymwolf_workout_id_index")
+  @@index([program_user_id], map: "trainer_program_user_tasks_done_program_user_id_index")
+  @@index([text_task_id], map: "trainer_program_user_tasks_done_text_task_id_index")
+  @@index([video_task_id], map: "trainer_program_user_tasks_done_video_task_id_index")
+  @@index([workout_template_task_id], map: "trainer_program_user_tasks_done_workout_template_task_id_index")
   @@map("trainer_program_user_tasks_done")
+}
+
+model admins {
+  id                BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  name              String       @db.VarChar(255)
+  email             String       @unique(map: "users_email_unique") @db.VarChar(255)
+  email_verified_at DateTime?    @db.Timestamp(0)
+  password          String       @db.VarChar(255)
+  remember_token    String?      @db.VarChar(100)
+  settings          String?      @db.Text
+  role_id           Int?
+  created_at        DateTime?    @db.Timestamp(0)
+  updated_at        DateTime?    @db.Timestamp(0)
+  user_roles        user_roles[]
+}
+
+model calorie_calculator_log {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  hash_id        String    @db.VarChar(255)
+  sex            String    @db.VarChar(255)
+  age            Int       @db.UnsignedInt
+  height         Int       @db.UnsignedInt
+  weight         Int       @db.UnsignedInt
+  activity_level String    @db.VarChar(255)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+}
+
+model challenge_comment_images {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  comment_id BigInt    @db.UnsignedBigInt
+  image_url  String    @db.VarChar(500)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  @@index([comment_id], map: "challenge_comment_images_comment_id_index")
+}
+
+model challenge_comment_likes {
+  id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id               Int
+  challenge_comments_id Int
+  deleted_at            DateTime? @db.Timestamp(0)
+  created_at            DateTime? @db.Timestamp(0)
+  updated_at            DateTime? @db.Timestamp(0)
+}
+
+model challenge_comments {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  challenge_id Int
+  user_id      Int
+  content      String    @db.Text
+  parent_id    Int?
+  deleted_at   DateTime? @db.Timestamp(0)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+}
+
+model challenge_feedback_comment_images {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  comment_id BigInt    @db.UnsignedBigInt
+  image_url  String    @db.VarChar(500)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  @@index([comment_id], map: "challenge_feedback_comment_images_comment_id_index")
+}
+
+model challenge_personal_feedback_comment_likes {
+  id                                     BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id                                Int
+  challenge_personal_feedback_comment_id Int
+  deleted_at                             DateTime? @db.Timestamp(0)
+  created_at                             DateTime? @db.Timestamp(0)
+  updated_at                             DateTime? @db.Timestamp(0)
+}
+
+model challenge_personal_feedback_comments {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  challenge_id Int
+  user_id      Int
+  content      String    @db.Text
+  parent_id    Int?
+  deleted_at   DateTime? @db.Timestamp(0)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+}
+
+model challenge_team_comment_likes {
+  id                        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id                   Int
+  challenge_team_comment_id Int
+  deleted_at                DateTime? @db.Timestamp(0)
+  created_at                DateTime? @db.Timestamp(0)
+  updated_at                DateTime? @db.Timestamp(0)
+}
+
+model challenge_team_comments {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  challenge_id Int
+  team_id      Int
+  user_id      Int
+  content      String    @db.Text
+  parent_id    Int?
+  deleted_at   DateTime? @db.Timestamp(0)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+}
+
+model challenge_team_comments_notification {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  value      Int       @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model currencies {
+  id            Int       @id @default(autoincrement())
+  currency      String    @db.VarChar(100)
+  currency_code String    @db.VarChar(10)
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model daily_challenge_notification {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  value      Int       @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model data_rows {
+  id           Int        @id @default(autoincrement()) @db.UnsignedInt
+  data_type_id Int        @db.UnsignedInt
+  field        String     @db.VarChar(255)
+  type         String     @db.VarChar(255)
+  display_name String     @db.VarChar(255)
+  required     Boolean    @default(false)
+  browse       Boolean    @default(true)
+  read         Boolean    @default(true)
+  edit         Boolean    @default(true)
+  add          Boolean    @default(true)
+  delete       Boolean    @default(true)
+  details      String?    @db.Text
+  order        Int        @default(1)
+  data_types   data_types @relation(fields: [data_type_id], references: [id], onDelete: Cascade, map: "data_rows_data_type_id_foreign")
+
+  @@index([data_type_id], map: "data_rows_data_type_id_foreign")
+}
+
+model data_types {
+  id                    Int         @id @default(autoincrement()) @db.UnsignedInt
+  name                  String      @unique(map: "data_types_name_unique") @db.VarChar(255)
+  slug                  String      @unique(map: "data_types_slug_unique") @db.VarChar(255)
+  display_name_singular String      @db.VarChar(255)
+  display_name_plural   String      @db.VarChar(255)
+  icon                  String?     @db.VarChar(255)
+  model_name            String?     @db.VarChar(255)
+  policy_name           String?     @db.VarChar(255)
+  controller            String?     @db.VarChar(255)
+  description           String?     @db.VarChar(255)
+  generate_permissions  Boolean     @default(false)
+  server_side           Int         @default(0) @db.TinyInt
+  details               String?     @db.Text
+  created_at            DateTime?   @db.Timestamp(0)
+  updated_at            DateTime?   @db.Timestamp(0)
+  data_rows             data_rows[]
+}
+
+model failed_jobs {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model fitq_api_codes {
+  id         Int       @id @default(autoincrement())
+  api_key    String    @db.VarChar(255)
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model fitty_exercises {
+  id             BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  workout_id     BigInt         @db.UnsignedBigInt
+  exercise_name  String         @db.VarChar(255)
+  exercise_index Int
+  reps           Int?
+  avg_accuracy   Int?
+  nr_mistakes    Int?
+  all_mistakes   Bytes?         @db.Blob
+  created_at     DateTime?      @db.Timestamp(0)
+  updated_at     DateTime?      @db.Timestamp(0)
+  fitty_workouts fitty_workouts @relation(fields: [workout_id], references: [id], onUpdate: Restrict, map: "fitty_exercises_workout_id_foreign")
+
+  @@index([workout_id], map: "fitty_exercises_workout_id_foreign")
+}
+
+model fitty_temp_workouts {
+  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  email               String?   @db.VarChar(255)
+  local_session_id    String?   @db.VarChar(255)
+  session_id          String    @db.VarChar(255)
+  jwt                 String    @db.VarChar(255)
+  external_workout_id String    @db.VarChar(255)
+  finalised           Boolean   @default(false)
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+  deleted_at          DateTime? @db.Timestamp(0)
+}
+
+model fitty_workouts {
+  id                  BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id             Int
+  session_id          String            @db.VarChar(255)
+  jwt                 String?           @db.Text
+  external_workout_id String            @db.VarChar(255)
+  kcal                Int?
+  score               Int?
+  avg_accuracy        Int?
+  finalised           Boolean           @default(false)
+  created_at          DateTime?         @db.Timestamp(0)
+  updated_at          DateTime?         @db.Timestamp(0)
+  fitty_exercises     fitty_exercises[]
+}
+
+model free_daily_videos {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  video_id    Int
+  date        DateTime  @db.Date
+  language_id Int?      @db.TinyInt
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  deleted_at  DateTime? @db.Timestamp(0)
+  videos      videos    @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "free_daily_videos_video_id_foreign")
+
+  @@index([video_id], map: "free_daily_videos_video_id_index")
+}
+
+model jobs {
+  id           BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  queue        String @db.VarChar(255)
+  payload      String @db.LongText
+  attempts     Int    @db.UnsignedTinyInt
+  reserved_at  Int?   @db.UnsignedInt
+  available_at Int    @db.UnsignedInt
+  created_at   Int    @db.UnsignedInt
+
+  @@index([queue], map: "jobs_queue_index")
+}
+
+model languages {
+  id              Int       @id @default(autoincrement())
+  language_name   String?   @db.VarChar(255)
+  language_native String?   @db.VarChar(255)
+  language_abbr   String?   @db.VarChar(255)
+  language_flag   String?   @db.Text
+  created_at      DateTime? @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model measurements_to_users {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  weight     Float
+  waist      Float
+  deleted_at DateTime? @db.Timestamp(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model menu_items {
+  id         Int       @id @default(autoincrement()) @db.UnsignedInt
+  menu_id    Int?      @db.UnsignedInt
+  title      String    @db.VarChar(255)
+  url        String    @db.VarChar(255)
+  target     String    @default("_self") @db.VarChar(255)
+  icon_class String?   @db.VarChar(255)
+  color      String?   @db.VarChar(255)
+  parent_id  Int?
+  order      Int
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  route      String?   @db.VarChar(255)
+  parameters String?   @db.Text
+  menus      menus?    @relation(fields: [menu_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "menu_items_menu_id_foreign")
+
+  @@index([menu_id], map: "menu_items_menu_id_foreign")
+}
+
+model menus {
+  id         Int          @id @default(autoincrement()) @db.UnsignedInt
+  name       String       @unique(map: "menus_name_unique") @db.VarChar(255)
+  created_at DateTime?    @db.Timestamp(0)
+  updated_at DateTime?    @db.Timestamp(0)
+  menu_items menu_items[]
+}
+
+model messenger_read_status {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  from_user_id    BigInt    @db.UnsignedBigInt
+  to_user_id      BigInt    @db.UnsignedBigInt
+  read_time       DateTime? @db.DateTime(0)
+  email_sent_time DateTime? @db.DateTime(0)
+  created_at      DateTime? @db.Timestamp(0)
+  updated_at      DateTime? @db.Timestamp(0)
+
+  @@index([from_user_id], map: "messenger_read_status_from_user_id_index")
+  @@index([to_user_id], map: "messenger_read_status_to_user_id_index")
+}
+
+model migrations {
+  id        Int    @id @default(autoincrement()) @db.UnsignedInt
+  migration String @db.VarChar(255)
+  batch     Int
+}
+
+model monthly_challenges {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title          String    @db.VarChar(255)
+  description    String    @db.Text
+  max_points     Int
+  external_link  String?   @db.VarChar(255)
+  image          String?   @db.VarChar(255)
+  time_available DateTime  @db.Date
+  language_id    Int       @db.TinyInt
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+  deleted_at     DateTime? @db.Timestamp(0)
+
+  @@unique([language_id, time_available], map: "monthly_challenges_language_id_time_available_unique")
+}
+
+model orders {
+  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id             BigInt    @db.UnsignedBigInt
+  trainer_id          BigInt    @db.UnsignedBigInt
+  product_id          BigInt    @db.UnsignedBigInt
+  status              String    @db.VarChar(255)
+  max_use_count       Int       @db.UnsignedInt
+  use_count           Int       @db.UnsignedInt
+  promocode_id        BigInt?   @db.UnsignedBigInt
+  amount              Decimal   @db.Decimal(19, 4)
+  currency            String    @db.Char(3)
+  name                String    @db.VarChar(255)
+  description         String    @db.Text
+  type                String    @db.VarChar(255)
+  expired_at          DateTime? @db.Timestamp(0)
+  cancel_allowed_from DateTime? @db.Date
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+  deleted_at          DateTime? @db.Timestamp(0)
+
+  @@index([promocode_id], map: "orders_promocode_id_index")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model password_resets {
+  email      String    @db.VarChar(255)
+  token      String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+
+  @@index([email], map: "password_resets_email_index")
+  @@ignore
+}
+
+model payments {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id      BigInt    @db.UnsignedBigInt
+  amount        Decimal   @db.Decimal(19, 4)
+  currency      String    @db.Char(3)
+  provider      String    @db.VarChar(255)
+  provider_meta Json
+  status        String    @db.VarChar(255)
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+  deleted_at    DateTime? @db.Timestamp(0)
+}
+
+model payouts {
+  id               Int       @id @default(autoincrement())
+  video_id         Int
+  user_id          Int
+  date             DateTime? @db.Timestamp(0)
+  payout_sum       Float
+  transaction_time DateTime  @default(now()) @db.Timestamp(0)
+  created_at       Int?
+  updated_at       DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model permission_role {
+  permission_id BigInt      @db.UnsignedBigInt
+  role_id       BigInt      @db.UnsignedBigInt
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "permission_role_permission_id_foreign")
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "permission_role_role_id_foreign")
+
+  @@id([permission_id, role_id])
+  @@index([permission_id], map: "permission_role_permission_id_index")
+  @@index([role_id], map: "permission_role_role_id_index")
+}
+
+model permissions {
+  id              BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  key             String            @db.VarChar(255)
+  table_name      String?           @db.VarChar(255)
+  created_at      DateTime?         @db.Timestamp(0)
+  updated_at      DateTime?         @db.Timestamp(0)
+  permission_role permission_role[]
+
+  @@index([key], map: "permissions_key_index")
+}
+
+model personal_access_tokens {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  tokenable_type String    @db.VarChar(255)
+  tokenable_id   BigInt    @db.UnsignedBigInt
+  name           String    @db.VarChar(255)
+  token          String    @unique(map: "personal_access_tokens_token_unique") @db.VarChar(64)
+  abilities      String?   @db.Text
+  last_used_at   DateTime? @db.Timestamp(0)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+
+  @@index([tokenable_type, tokenable_id], map: "personal_access_tokens_tokenable_type_tokenable_id_index")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model pricing_main {
+  id                       Int       @id @default(autoincrement())
+  subscription_title       String    @db.VarChar(255)
+  subscription_desc        String?   @db.VarChar(255)
+  subscription_price       Float
+  subscription_currency_id Int
+  subscription_duration    Int
+  subs_type                Int       @default(0) @db.SmallInt
+  service_id               Int
+  sort_order               Int?
+  rebuy                    Int       @default(1) @db.SmallInt
+  available_for_trainers   Int       @default(0) @db.TinyInt
+  video_id                 Int?      @default(0)
+  trainer_id               Int?      @default(0)
+  event_ticket             Int?
+  hidden                   Boolean   @default(false)
+  created_at               DateTime? @db.Timestamp(0)
+  updated_at               DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model pricings {
+  id                       Int       @id @default(autoincrement())
+  user_id                  Int
+  pricing_main_id          Int?
+  subscription_title       String    @db.VarChar(255)
+  subscription_price       Float
+  subscription_currency_id Int
+  subscription_duration    Int
+  subs_type                Int       @default(0) @db.SmallInt
+  service_id               Int?
+  approved                 Int       @default(0)
+  rebuy                    Int       @default(1) @db.TinyInt
+  sort_order               Int       @default(0)
+  video_id                 Int?      @default(0)
+  event_ticket             Int?
+  created_at               DateTime? @db.Timestamp(0)
+  updated_at               DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model problems_reported {
+  id          Int      @id @default(autoincrement())
+  video_id    Int
+  user_id     Int
+  report_text String   @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model problems_reported_table {
+  id          Int      @id @default(autoincrement())
+  video_id    Int
+  user_id     Int
+  report_text String   @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model product_promocodes {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  product_id    BigInt?   @db.UnsignedBigInt
+  trainer_id    Int
+  code          String    @db.VarChar(255)
+  usage_limit   Int?
+  uses          Int       @default(0)
+  discount_type String    @db.VarChar(255)
+  discount      Decimal   @db.Decimal(8, 4)
+  starts_at     DateTime  @default(now()) @db.DateTime(0)
+  expires_at    DateTime? @db.DateTime(0)
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+  deleted_at    DateTime? @db.Timestamp(0)
+
+  @@index([product_id], map: "product_promocodes_product_id_index")
+  @@index([trainer_id], map: "product_promocodes_trainer_id_index")
+}
+
+model product_translations {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  product_id  Int       @db.UnsignedInt
+  locale      String    @db.VarChar(5)
+  name        String    @db.VarChar(255)
+  description String    @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  deleted_at  DateTime? @db.Timestamp(0)
+
+  @@index([product_id], map: "product_translations_product_id_index")
+}
+
+model products {
+  id                                  BigInt                                @id @default(autoincrement()) @db.UnsignedBigInt
+  trainer_id                          BigInt                                @db.UnsignedBigInt
+  name                                String                                @db.VarChar(255)
+  description                         String                                @db.Text
+  type                                String                                @db.VarChar(255)
+  price                               Decimal                               @db.Decimal(19, 4)
+  discounted_price                    Decimal?                              @db.Decimal(19, 4)
+  currency                            String                                @db.Char(3)
+  max_use_count                       Int                                   @default(1) @db.UnsignedInt
+  expires_in_days                     Int                                   @default(0) @db.UnsignedInt
+  contract_length_in_months           Int?                                  @db.UnsignedTinyInt
+  program_id                          BigInt?                               @db.UnsignedBigInt
+  trainer_ticket_category_id          Int?                                  @db.UnsignedInt
+  created_at                          DateTime?                             @db.Timestamp(0)
+  updated_at                          DateTime?                             @db.Timestamp(0)
+  deleted_at                          DateTime?                             @db.Timestamp(0)
+  trainer_program_associated_products trainer_program_associated_products[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model purchases {
+  id                Int       @id @default(autoincrement())
+  video_id          Int?
+  user_id           Int
+  pricing_id        Int?
+  purchase_log_id   String?   @db.VarChar(255)
+  esto_id           String?   @db.VarChar(255)
+  order_reference   String?   @db.VarChar(255)
+  payment_reference String?   @db.VarChar(255)
+  price             Float?
+  pricing_type      Int?
+  trainer_id        Int?      @default(0) @db.SmallInt
+  purchased         Int       @default(0)
+  coupon_used       String?   @db.VarChar(100)
+  pricing_main      Boolean   @default(false)
+  is_used           Boolean   @default(false)
+  created_at        DateTime? @db.Timestamp(0)
+  updated_at        DateTime  @default(now()) @db.Timestamp(0)
+  migrated          Boolean   @default(false)
+}
+
+model reaction_types {
+  id                   Int      @id @default(autoincrement())
+  name                 String   @db.VarChar(100)
+  reaction_thumb       String   @db.Text
+  reaction_thumb_hover String?  @db.Text
+  created_at           DateTime @default(now()) @db.Timestamp(0)
+  updated_at           DateTime @default(now()) @db.Timestamp(0)
+}
+
+model roles {
+  id              BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  name            String            @unique(map: "roles_name_unique") @db.VarChar(255)
+  display_name    String            @db.VarChar(255)
+  created_at      DateTime?         @db.Timestamp(0)
+  updated_at      DateTime?         @db.Timestamp(0)
+  permission_role permission_role[]
+  user_roles      user_roles[]
+  users           users[]
+}
+
+model settings {
+  id           Int     @id @default(autoincrement()) @db.UnsignedInt
+  key          String  @unique(map: "settings_key_unique") @db.VarChar(255)
+  display_name String  @db.VarChar(255)
+  value        String? @db.Text
+  details      String? @db.Text
+  type         String  @db.VarChar(255)
+  order        Int     @default(1)
+  group        String? @db.VarChar(255)
+}
+
+model static_contents {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  content    String    @db.Text
+  key        String    @db.VarChar(64)
+  language   Int
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+}
+
+model subscription_cancellation_reasons {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_subscription_id Int
+  reason               String    @db.Text
+  created_at           DateTime? @db.Timestamp(0)
+  updated_at           DateTime? @db.Timestamp(0)
+  migrated             Boolean   @default(false)
+}
+
+model teams_data {
+  id              Int      @id @default(autoincrement())
+  team_name       String   @db.VarChar(255)
+  team_captain_id Int?
+  challenge_id    Int?
+  points          Int      @default(0)
+  calories_burned Int      @default(0)
+  kwh_worked      Float    @default(0.000)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  updated_at      DateTime @default(now()) @db.Timestamp(0)
+}
+
+model trainer_bonuses {
+  id                Int      @id @default(autoincrement())
+  trainer_id        Int?
+  admin_id          Int?
+  bonus_sum         Float?
+  bonus_currency_id Int?
+  created_at        DateTime @default(now()) @db.Timestamp(0)
+  updated_at        DateTime @default(now()) @db.Timestamp(0)
+}
+
+model trainer_commissions {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  trainer_id   BigInt    @db.UnsignedBigInt
+  product_type String    @db.VarChar(255)
+  percentage   Decimal   @db.Decimal(5, 2)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+
+  @@index([trainer_id], map: "trainer_commissions_trainer_id_index")
+}
+
+model trainer_payment_infos {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  trainer_id   BigInt    @db.UnsignedBigInt
+  recipient    String    @db.VarChar(255)
+  bank_account String    @db.VarChar(255)
+  address      String    @db.VarChar(255)
+  vat_number   String?   @db.VarChar(255)
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+  users        users     @relation(fields: [trainer_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_payment_infos_trainer_id_foreign")
+
+  @@index([trainer_id], map: "trainer_payment_infos_trainer_id_index")
+}
+
+model trainer_price_per_clicks {
+  id                Int      @id @default(autoincrement())
+  price_per_view    Decimal  @db.Decimal(10, 5)
+  start_date        DateTime @db.DateTime(0)
+  end_date          DateTime @db.DateTime(0)
+  price_currency_id Int      @default(3)
+  created_at        DateTime @default(now()) @db.Timestamp(0)
+  updated_at        DateTime @default(now()) @db.Timestamp(0)
+}
+
+model trainer_program_access {
+  id               BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id       BigInt         @db.UnsignedBigInt
+  email            String         @db.VarChar(255)
+  user_id          BigInt?        @db.UnsignedBigInt
+  created_at       DateTime?      @db.Timestamp(0)
+  updated_at       DateTime?      @db.Timestamp(0)
+  deleted_at       DateTime?      @db.Timestamp(0)
+  trainer_programs TrainerProgram @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "trainer_program_access_program_id_foreign")
+  users            users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "trainer_program_access_user_id_foreign")
+
+  @@index([program_id], map: "trainer_program_access_program_id_foreign")
+  @@index([user_id], map: "trainer_program_access_user_id_foreign")
+}
+
+model trainer_program_associated_products {
+  id               BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id       BigInt         @db.UnsignedBigInt
+  product_id       BigInt         @db.UnsignedBigInt
+  created_at       DateTime?      @db.Timestamp(0)
+  updated_at       DateTime?      @db.Timestamp(0)
+  deleted_at       DateTime?      @db.Timestamp(0)
+  products         products       @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "trainer_program_associated_products_product_id_foreign")
+  trainer_programs TrainerProgram @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "trainer_program_associated_products_program_id_foreign")
+
+  @@index([product_id], map: "trainer_program_associated_products_product_id_foreign")
+  @@index([program_id], map: "trainer_program_associated_products_program_id_foreign")
+}
+
+model trainer_program_comment_images {
+  id                       BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  comment_id               BigInt                   @db.UnsignedBigInt
+  image_url                String                   @db.VarChar(500)
+  created_at               DateTime?                @db.Timestamp(0)
+  updated_at               DateTime?                @db.Timestamp(0)
+  deleted_at               DateTime?                @db.Timestamp(0)
+  trainer_program_comments trainer_program_comments @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_comment_images_comment_id_foreign")
+
+  @@index([comment_id], map: "trainer_program_comment_images_comment_id_index")
+}
+
+model trainer_program_comment_likes {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  comment_id Int
+  deleted_at DateTime? @db.Timestamp(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model trainer_program_comments {
+  id                             BigInt                           @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id                     Int
+  user_id                        Int
+  content                        String                           @db.Text
+  parent_id                      Int?
+  deleted_at                     DateTime?                        @db.Timestamp(0)
+  created_at                     DateTime?                        @db.Timestamp(0)
+  updated_at                     DateTime?                        @db.Timestamp(0)
+  trainer_program_comment_images trainer_program_comment_images[]
+}
+
+model trainer_program_feedback {
+  id                              BigInt                            @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id                      Int
+  user_id                         Int
+  content                         String                            @db.Text
+  parent_id                       Int?
+  deleted_at                      DateTime?                         @db.Timestamp(0)
+  created_at                      DateTime?                         @db.Timestamp(0)
+  updated_at                      DateTime?                         @db.Timestamp(0)
+  trainer_program_feedback_images trainer_program_feedback_images[]
+}
+
+model trainer_program_feedback_images {
+  id                       BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  comment_id               BigInt                   @db.UnsignedBigInt
+  image_url                String                   @db.VarChar(500)
+  created_at               DateTime?                @db.Timestamp(0)
+  updated_at               DateTime?                @db.Timestamp(0)
+  deleted_at               DateTime?                @db.Timestamp(0)
+  trainer_program_feedback trainer_program_feedback @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_feedback_images_comment_id_foreign")
+
+  @@index([comment_id], map: "trainer_program_feedback_images_comment_id_index")
+}
+
+model trainer_program_feedback_likes {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  comment_id Int
+  deleted_at DateTime? @db.Timestamp(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model trainer_program_intro_videos {
+  id               BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id       BigInt         @db.UnsignedBigInt
+  vimeo_id         String         @db.VarChar(255)
+  vimeo_hash_param String?        @db.VarChar(255)
+  created_at       DateTime?      @db.Timestamp(0)
+  updated_at       DateTime?      @db.Timestamp(0)
+  deleted_at       DateTime?      @db.Timestamp(0)
+  trainer_programs TrainerProgram @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_intro_videos_program_id_foreign")
+
+  @@index([program_id], map: "trainer_program_intro_videos_program_id_index")
+}
+
+model trainer_program_moderators {
+  id                  BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id          BigInt         @db.UnsignedBigInt
+  user_id             BigInt         @db.UnsignedBigInt
+  display_in_overview Int            @default(0) @db.TinyInt
+  created_at          DateTime?      @db.Timestamp(0)
+  updated_at          DateTime?      @db.Timestamp(0)
+  deleted_at          DateTime?      @db.Timestamp(0)
+  trainer_programs    TrainerProgram @relation(fields: [program_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_moderators_program_id_foreign")
+  users               users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "trainer_program_moderators_user_id_foreign")
+
+  @@index([program_id], map: "trainer_program_moderators_program_id_index")
+  @@index([user_id], map: "trainer_program_moderators_user_id_index")
+}
+
+model trainer_subscription_cancellation_reasons {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id   Int
+  reason     String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model trainer_ticket_categories {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  code       String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model trainer_transfer_requests {
+  id           Int      @id @default(autoincrement())
+  transfer_sum Decimal  @db.Decimal(10, 5)
+  applied      Int      @default(0) @db.SmallInt
+  trainer_id   Int
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+  updated_at   DateTime @default(now()) @db.Timestamp(0)
+}
+
+model trainers_price_per_clicks {
+  id                Int      @id @default(autoincrement())
+  price_per_view    Decimal  @db.Decimal(10, 5)
+  start_date        DateTime @db.DateTime(0)
+  end_date          DateTime @db.DateTime(0)
+  price_currency_id Int      @default(3)
+  created_at        DateTime @default(now()) @db.Timestamp(0)
+  updated_at        DateTime @default(now()) @db.Timestamp(0)
+}
+
+model trainers_to_challenges {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  challenge_id Int
+  trainer_id   Int
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+}
+
+model trainers_transfer_requests {
+  id           Int      @id @default(autoincrement())
+  transfer_sum Decimal  @db.Decimal(10, 5)
+  applied      Int      @default(0) @db.SmallInt
+  trainer_id   Int
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+  updated_at   DateTime @default(now()) @db.Timestamp(0)
+}
+
+model transaction_trainers {
+  id                 Int       @id @default(autoincrement())
+  trainer_id         Int
+  transaction_amount Float
+  transaction_type   String    @db.VarChar(255)
+  video_id           Int
+  user_id            Int
+  order_id           Int?
+  admin_remark       String    @db.Text
+  payment_cleared    Int       @default(0) @db.TinyInt
+  account_total      Float
+  created_at         DateTime? @db.Timestamp(0)
+  updated_at         DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model transaction_user_types {
+  id          Int      @id @default(autoincrement())
+  description String   @db.Text
+  type        String   @db.VarChar(100)
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model transaction_users {
+  id                 Int       @id @default(autoincrement())
+  user_id            Int
+  transaction_amount Float
+  transaction_type   Int
+  video_id           Int
+  friend_id          Int
+  ticket_id          Int
+  account_total      Float
+  created_at         DateTime? @db.Timestamp(0)
+  updated_at         DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model translations {
+  id          Int       @id @default(autoincrement()) @db.UnsignedInt
+  table_name  String    @db.VarChar(255)
+  column_name String    @db.VarChar(255)
+  foreign_key Int       @db.UnsignedInt
+  locale      String    @db.VarChar(255)
+  value       String    @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+
+  @@unique([table_name, column_name, foreign_key, locale], map: "translations_table_name_column_name_foreign_key_locale_unique")
+}
+
+model user_invite_links {
+  id               Int      @id @default(autoincrement())
+  user_id          Int
+  link_code_invite String   @db.Text
+  user_invited     Int      @default(0)
+  created_at       DateTime @default(now()) @db.Timestamp(0)
+  updated_at       DateTime @default(now()) @db.Timestamp(0)
+}
+
+model user_invites {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt    @db.UnsignedBigInt
+  email      String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_invites_user_id_foreign")
+
+  @@index([user_id], map: "user_invites_user_id_foreign")
+}
+
+model user_points {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  points     Int
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  type       String?   @db.VarChar(255)
+  type_id    Int?
+  deleted_at DateTime? @db.Timestamp(0)
+
+  @@index([user_id], map: "user_points_user_id_index")
+}
+
+model user_roles {
+  user_id BigInt @db.UnsignedBigInt
+  role_id BigInt @db.UnsignedBigInt
+  roles   roles  @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_roles_role_id_foreign")
+  admins  admins @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_roles_user_id_foreign")
+
+  @@id([user_id, role_id])
+  @@index([role_id], map: "user_roles_role_id_index")
+  @@index([user_id], map: "user_roles_user_id_index")
+}
+
+model user_sub_to_trainers {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  trainer_id Int
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+}
+
+model users {
+  id                                    BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  role_id                               BigInt?                      @db.UnsignedBigInt
+  name                                  String?                      @db.VarChar(255)
+  profile_desc                          String?                      @db.Text
+  trainer_welcome_title                 String?                      @db.VarChar(255)
+  trainer_welcome_desc                  String?                      @db.Text
+  email                                 String?                      @db.VarChar(255)
+  avatar                                String?                      @default("users/default.png") @db.VarChar(255)
+  external_avatar                       String?                      @db.Text
+  trainer_channel_image                 String?                      @db.VarChar(255)
+  biography_image                       String?                      @db.Text
+  trainer_iframe_intro                  String?                      @db.Text
+  show_intro                            Int?                         @default(1) @db.TinyInt
+  password                              String?                      @db.VarChar(255)
+  birthday                              DateTime?                    @db.DateTime(0)
+  sex                                   String?                      @db.VarChar(255)
+  height                                Int?
+  weight                                Int?
+  profile_pic                           String?                      @db.Text
+  user_language                         Int?
+  trainer_unlocked                      Boolean?
+  display_on_trainers_list              Boolean                      @default(false)
+  remember_token                        String?                      @db.Text
+  email_verified_at                     DateTime?                    @db.Timestamp(0)
+  language_id                           Int?                         @default(1)
+  weekly_news                           Int                          @default(1) @db.SmallInt
+  monthly_news                          Int                          @default(1) @db.SmallInt
+  notifications                         String?                      @db.Text
+  trainer_notification                  String?                      @db.Text
+  facebook_id                           String?                      @db.VarChar(255)
+  google_id                             String?                      @db.VarChar(255)
+  sport_id_id                           String?                      @db.VarChar(255)
+  sport_id_email                        String?                      @db.VarChar(255)
+  sport_id_refresh_token                String?                      @db.Text
+  sport_id_assess_token                 String?                      @db.Text
+  gymwolf_session                       String?                      @db.VarChar(255)
+  agora_id                              String?                      @db.VarChar(255)
+  utm_data                              String?                      @db.Text
+  country                               String?                      @db.Text
+  timezone                              String?                      @db.VarChar(255)
+  trial_end                             Int?                         @db.SmallInt
+  last_login                            DateTime?                    @db.DateTime(0)
+  simple_link                           String?                      @db.VarChar(255)
+  link_og_image                         String?                      @db.VarChar(255)
+  wallet                                Decimal?                     @default(0.00000) @db.Decimal(10, 5)
+  user_credit                           Float                        @default(0.000)
+  user_invited_by                       Int                          @default(0)
+  user_first_buy                        Int                          @default(0) @db.TinyInt
+  total_video_views                     Int                          @default(0)
+  fee_percentage                        Int?                         @default(0)
+  hide_name_from_leaderboards           Int?                         @db.UnsignedTinyInt
+  comment_email_notifications           Boolean                      @default(true)
+  program_unit_info_email_notifications Boolean                      @default(true)
+  getresponse_tags                      String?                      @db.VarChar(255)
+  created_at                            DateTime?                    @db.Timestamp(0)
+  updated_at                            DateTime                     @default(now()) @db.Timestamp(0)
+  is_admin                              Boolean?                     @default(false)
+  trainer_payment_infos                 trainer_payment_infos[]
+  trainer_program_access                trainer_program_access[]
+  trainer_program_moderators            trainer_program_moderators[]
+  trainer_program_users                 TrainerProgramUser[]
+  user_invites                          user_invites[]
+  roles                                 roles?                       @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_role_id_foreign")
+  video_feedback                        video_feedback[]
+  video_trainers                        VideoTrainer[]
+
+  @@index([role_id], map: "users_role_id_foreign")
+}
+
+model users_subscriptions {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int?
+  user_email          String?   @db.VarChar(255)
+  trainer_id          Int?      @default(0)
+  video_id            Int?
+  pricing_id          Int?
+  subscription_start  DateTime? @db.DateTime(0)
+  subscription_end    DateTime? @db.DateTime(0)
+  subscription_type   Int?      @default(0) @db.SmallInt
+  service_id          String?   @db.VarChar(255)
+  active              Int?      @default(1)
+  token               String?   @db.Text
+  sub_order_reference String?   @db.VarChar(255)
+  free                Int?      @default(0) @db.TinyInt
+  canceled_time       DateTime? @db.DateTime(0)
+  coupon_used         String?   @db.VarChar(100)
+  created_at          DateTime? @default(now()) @db.Timestamp(0)
+  updated_at          DateTime  @default(now()) @db.Timestamp(0)
+  migrated            Boolean   @default(false)
+}
+
+model users_to_teams {
+  id           Int       @id @default(autoincrement())
+  user_id      Int?
+  team_id      Int
+  user_email   String?   @db.VarChar(255)
+  challenge_id Int?
+  points       Int?      @default(0)
+  joined_at    DateTime? @db.Timestamp(0)
+  created_at   DateTime  @default(now()) @db.Timestamp(0)
+  updated_at   DateTime  @default(now()) @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+}
+
+model video_availability_exceptions {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  video_id   BigInt    @db.UnsignedBigInt
+  date_from  DateTime  @db.DateTime(0)
+  date_to    DateTime  @db.DateTime(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model video_categories {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  image      String?   @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model LoginCode {
+  id          Int       @id @default(autoincrement())
+  email       String    @db.VarChar(255)
+  challengeId String    @unique(map: "challenge_id") @map("challenge_id")
+  codeHash    String    @map("code_hash")
+  expiresAt   DateTime  @map("expires_at") @db.DateTime(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  consumedAt  DateTime? @map("consumed_at") @db.DateTime(0)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime? @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("login_codes")
+}
+
+model DeviceSession {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  deviceName String?   @map("device_name")
+  ip         String?
+  ua         String?   @db.VarChar(255)
+  lastUsedAt DateTime? @map("last_used_at") @db.DateTime(0)
+  createdAt  DateTime? @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt  DateTime? @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("device_sessions")
+}
+
+model RefreshToken {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  deviceSessionId Int       @map("device_session_id")
+  tokenHash       String    @map("token_hash")
+  revokedAt       DateTime? @map("revoked_at") @db.DateTime(0)
+  expiresAt       DateTime  @map("expires_at") @db.DateTime(0)
+  createdAt       DateTime? @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt       DateTime? @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@index([tokenHash], map: "idx_token_hash")
+  @@map("refresh_tokens")
+}
+
+model video_comment_images {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  comment_id BigInt    @db.UnsignedBigInt
+  image_url  String    @db.VarChar(500)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  @@index([comment_id], map: "video_comment_images_comment_id_index")
+}
+
+model video_comment_likes {
+  id               BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id          Int
+  video_comment_id Int
+  deleted_at       DateTime? @db.Timestamp(0)
+  created_at       DateTime? @db.Timestamp(0)
+  updated_at       DateTime? @db.Timestamp(0)
+}
+
+model video_comments {
+  id         Int       @id @default(autoincrement())
+  video_id   Int
+  user_id    Int
+  parent_id  Int?
+  content    String    @db.Text
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  updated_at DateTime  @default(now()) @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+}
+
+model video_favorites {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int       @db.UnsignedInt
+  video_id   Int       @db.UnsignedInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+}
+
+model video_feedback {
+  id                          BigInt                      @id @default(autoincrement()) @db.UnsignedBigInt
+  video_id                    Int
+  user_id                     BigInt                      @db.UnsignedBigInt
+  feedback                    String?                     @db.Text
+  rating                      Int                         @db.SmallInt
+  watch_id                    Int
+  deleted_at                  DateTime?                   @db.Timestamp(0)
+  created_at                  DateTime?                   @db.Timestamp(0)
+  updated_at                  DateTime?                   @db.Timestamp(0)
+  users                       users                       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "video_feedback_user_id_foreign")
+  videos                      videos                      @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "video_feedback_video_id_foreign")
+  video_time_watched_by_users video_time_watched_by_users @relation(fields: [watch_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "video_feedback_watch_id_foreign")
+
+  @@index([user_id], map: "video_feedback_user_id_foreign")
+  @@index([video_id], map: "video_feedback_video_id_foreign")
+  @@index([watch_id], map: "video_feedback_watch_id_foreign")
+}
+
+model video_reactions {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  video_id    Int
+  reaction_id Int
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model video_time_watched_by_users {
+  id                      Int              @id @default(autoincrement())
+  video_id                Int
+  user_id                 Int
+  trainer_id              Int              @default(0)
+  watch_time_seconds      Int
+  playhead_position       Int?             @default(0)
+  calories_burned         Int?
+  paid                    Int              @default(0) @db.TinyInt
+  user_cash               Float            @default(0.000)
+  trainer_cash            Float            @default(0.000)
+  currently_watching_live Int              @default(0) @db.TinyInt
+  created_at              DateTime         @default(now()) @db.Timestamp(0)
+  updated_at              DateTime         @default(now()) @db.Timestamp(0)
+  completed_at            DateTime?        @db.Timestamp(0)
+  video_feedback          video_feedback[]
+
+  @@index([user_id], map: "video_time_watched_by_users_user_id_index")
+}
+
+model video_upcoming_lives {
+  id         Int       @id @default(autoincrement())
+  video_id   Int
+  start_time DateTime? @db.DateTime(0)
+  end_time   DateTime? @db.DateTime(0)
+  hidden     Int?      @db.SmallInt
+  location   String?   @db.VarChar(255)
+  real_life  Boolean   @default(false)
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  updated_at DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model video_user_bookmarks {
+  id         Int      @id @default(autoincrement())
+  video_id   Int
+  user_id    Int
+  bookmarked Boolean
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+}
+
+model videos {
+  id                                   Int                               @id @default(autoincrement())
+  user_id                              Int
+  live                                 Boolean
+  on_demand                            Boolean
+  recommend                            Int?                              @default(0) @db.TinyInt
+  start_time                           DateTime?                         @db.DateTime(0)
+  end_time                             DateTime?                         @db.DateTime(0)
+  available_from                       DateTime?                         @db.DateTime(0)
+  available_until                      DateTime?                         @db.DateTime(0)
+  duration                             Int
+  category                             Int
+  equipment                            String?                           @db.Text
+  energy_consumption                   Int
+  description                          String                            @db.Text
+  title                                String                            @db.Text
+  keywords                             String?                           @db.Text
+  hidden                               Boolean
+  hidden_hash                          String?                           @db.VarChar(255)
+  video_deleted                        Int?                              @default(0) @db.TinyInt
+  iframe                               String?                           @db.Text
+  video_preview                        String?                           @db.Text
+  video_preview_external               String?                           @db.Text
+  video_language                       String                            @default("0") @db.VarChar(255)
+  open_for_subsribers                  Boolean
+  open_for_tickets                     Boolean
+  open_for_free                        Boolean
+  single_ticket_price                  Float
+  reported_bad                         Boolean
+  pos_names                            String?                           @db.VarChar(255)
+  type                                 String?                           @db.VarChar(255)
+  src                                  String?                           @db.VarChar(255)
+  src_type                             String?                           @db.VarChar(255)
+  deleted_at                           String?                           @db.VarChar(255)
+  unlisted                             String?                           @db.VarChar(255)
+  id_on_sport                          Int                               @default(0)
+  rtmp_data                            String?                           @db.Text
+  video_platform                       String?                           @db.Text
+  playback_url                         String?                           @db.Text
+  record_id                            String?                           @db.VarChar(255)
+  rewatch                              Int?                              @db.SmallInt
+  vimeo_id                             String?                           @db.VarChar(255)
+  acrcloud_file_id                     String?                           @db.VarChar(255)
+  acrcloud_processed                   Int?                              @db.UnsignedTinyInt
+  views                                Int                               @default(0)
+  video_test                           Int?                              @default(0) @db.TinyInt
+  video_for_challenge                  Int                               @default(0)
+  created_at                           DateTime?                         @default(now()) @db.Timestamp(0)
+  updated_at                           DateTime                          @default(now()) @db.Timestamp(0)
+  free_daily_videos                    free_daily_videos[]
+  trainer_program_unit_video_materials TrainerProgramUnitVideoMaterial[]
+  trainer_program_unit_video_tasks     TrainerProgramUnitVideoTask[]
+  video_feedback                       video_feedback[]
+  video_trainers                       VideoTrainer[]
+  weekly_schedule_videos               weekly_schedule_videos[]
+}
+
+model videos_kwh_price {
+  id         Int       @id @default(autoincrement())
+  date_from  DateTime? @db.Date
+  date_to    DateTime? @db.Date
+  kwh_price  Decimal   @default(0.000) @db.Decimal(10, 3)
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  updated_at DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model voting_competition_option_users {
+  id                           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  voting_competition_option_id BigInt    @db.UnsignedBigInt
+  user_id                      BigInt    @db.UnsignedBigInt
+  created_at                   DateTime? @db.Timestamp(0)
+  updated_at                   DateTime? @db.Timestamp(0)
+  deleted_at                   DateTime? @db.Timestamp(0)
+}
+
+model voting_competition_options {
+  id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  voting_competition_id BigInt    @db.UnsignedBigInt
+  title                 String    @db.VarChar(255)
+  title_en              String?   @db.VarChar(255)
+  created_at            DateTime? @db.Timestamp(0)
+  updated_at            DateTime? @db.Timestamp(0)
+  deleted_at            DateTime? @db.Timestamp(0)
+}
+
+model voting_competitions {
+  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title               String    @db.VarChar(255)
+  description         String    @db.Text
+  image               String?   @db.VarChar(500)
+  start_date          DateTime  @db.DateTime(0)
+  end_date            DateTime  @db.DateTime(0)
+  exercise_names      String    @db.VarChar(255)
+  title_en            String?   @db.VarChar(255)
+  description_en      String?   @db.Text
+  allow_score_preview Boolean   @default(false)
+  email_sent          Boolean   @default(false)
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+  deleted_at          DateTime? @db.Timestamp(0)
+}
+
+model voyager_admins {
+  id         Int       @id @default(autoincrement()) @db.UnsignedInt
+  name       String    @db.VarChar(255)
+  email      String    @unique(map: "voyager_admins_email_unique") @db.VarChar(255)
+  password   String?   @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model weekly_schedule_videos {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  video_id     Int
+  scheduled_at DateTime  @db.Date
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+  videos       videos    @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "weekly_schedule_videos_video_id_foreign")
+
+  @@index([video_id], map: "weekly_schedule_videos_video_id_index")
+}
+
+model workout_bonus_task_done {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id      Int
+  workout_id   Int
+  challenge_id Int
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+}
+
+model workout_exercises {
+  id                      Int       @id @default(autoincrement())
+  exercise_name           String    @db.VarChar(255)
+  excercise_main_category Int?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model workout_to_videos {
+  id         Int      @id @default(autoincrement())
+  workout_id Int
+  video_id   Int
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+}
+
+model workout_user_done {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  workout_id   Int
+  challenge_id Int?
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+  updated_at   DateTime @default(now()) @db.Timestamp(0)
+}
+
+model workouts {
+  id               Int       @id @default(autoincrement())
+  trainer_id       Int
+  user_id          Int?
+  recommended_date DateTime? @db.Timestamp(0)
+  recommended_day  Int?
+  longer_comment   String?   @db.Text
+  bonus_task       String?   @db.Text
+  workout_name     String?   @db.VarChar(255)
+  challenge_id     Int?
+  is_rest_day      Int       @default(0) @db.TinyInt
+  preview          String?   @db.Text
+  created_at       DateTime? @db.Timestamp(0)
+  updated_at       DateTime  @default(now()) @db.Timestamp(0)
+}
+
+model trainer_testimonials {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  trainer_id BigInt    @db.UnsignedBigInt
+  user_id    BigInt    @db.UnsignedBigInt
+  rating     Int       @db.UnsignedTinyInt
+  comment    String?   @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@unique([user_id, trainer_id], map: "unique_user_trainer")
+  @@index([trainer_id], map: "idx_trainer_id")
+  @@index([user_id], map: "idx_user_id")
 }

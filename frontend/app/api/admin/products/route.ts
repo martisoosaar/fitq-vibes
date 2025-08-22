@@ -14,13 +14,14 @@ export async function GET(request: NextRequest) {
     }
 
     const tokenData = await validateRefreshToken(refreshCookie.value)
-    if (!tokenData || !tokenData.user) {
+    if (!tokenData) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
     
-    // Check if user is admin (you may want to adjust this based on your role system)
-    if (tokenData.user.roleId !== 1 && tokenData.user.email !== 'marti@fitq.studio') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Load user from database
+    const user = await prisma.users.findUnique({ where: { id: Number(tokenData.userId) } })
+    if (!user || !user.is_admin) {
+      return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 })
     }
 
     // Get query parameters
@@ -28,66 +29,94 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const search = searchParams.get('search') || ''
-    const category = searchParams.get('category') || ''
-    const isActive = searchParams.get('isActive')
+    const type = searchParams.get('type') || ''
+    const trainerId = searchParams.get('trainerId') || ''
     
     const skip = (page - 1) * limit
 
     // Build where clause
-    const where: any = {}
+    const where: any = {
+      deleted_at: null
+    }
     
     if (search) {
       where.OR = [
         { name: { contains: search } },
-        { description: { contains: search } },
-        { sku: { contains: search } }
+        { description: { contains: search } }
       ]
     }
     
-    if (category) {
-      where.category = category
+    if (type) {
+      where.type = type
     }
     
-    if (isActive !== null && isActive !== undefined) {
-      where.isActive = isActive === 'true'
+    if (trainerId) {
+      where.trainer_id = BigInt(trainerId)
     }
 
     // Get products
     const [products, total] = await Promise.all([
-      prisma.product.findMany({
+      prisma.products.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          trainer: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          _count: {
-            select: { orderItems: true }
-          }
-        }
+        orderBy: { created_at: 'desc' }
       }),
-      prisma.product.count({ where })
+      prisma.products.count({ where })
     ])
 
-    // Get categories for filter
-    const categories = await prisma.product.findMany({
-      select: { category: true },
-      distinct: ['category'],
-      where: { category: { not: null } }
+    // Get trainer info for each product
+    const trainerIds = [...new Set(products.map(p => Number(p.trainer_id)))]
+    const trainers = await prisma.users.findMany({
+      where: { id: { in: trainerIds } },
+      select: { id: true, name: true, email: true }
+    })
+    const trainerMap = new Map(trainers.map(t => [Number(t.id), t]))
+    
+    // Get product types for filter
+    const allTypes = await prisma.products.findMany({
+      select: { type: true },
+      where: { deleted_at: null }
+    })
+    const uniqueTypes = [...new Set(allTypes.map(p => p.type).filter(Boolean))]
+    
+    // Format products with trainer info
+    const formattedProducts = products.map(product => {
+      const trainerId = Number(product.trainer_id)
+      const trainer = trainerMap.get(trainerId)
+      
+      return {
+        id: Number(product.id),
+        trainer_id: trainerId,
+        name: String(product.name),
+        description: String(product.description),
+        type: String(product.type),
+        price: Number(product.price),
+        discounted_price: product.discounted_price ? Number(product.discounted_price) : null,
+        currency: String(product.currency),
+        max_use_count: Number(product.max_use_count),
+        expires_in_days: Number(product.expires_in_days),
+        contract_length_in_months: product.contract_length_in_months ? Number(product.contract_length_in_months) : null,
+        program_id: product.program_id ? Number(product.program_id) : null,
+        trainer_ticket_category_id: product.trainer_ticket_category_id ? Number(product.trainer_ticket_category_id) : null,
+        created_at: product.created_at ? product.created_at.toISOString() : null,
+        updated_at: product.updated_at ? product.updated_at.toISOString() : null,
+        deleted_at: product.deleted_at ? product.deleted_at.toISOString() : null,
+        trainer: trainer ? {
+          id: Number(trainer.id),
+          name: String(trainer.name || ''),
+          email: String(trainer.email || '')
+        } : null
+      }
     })
 
     return NextResponse.json({
-      products,
-      total,
+      products: formattedProducts,
+      total: Number(total),
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
-      categories: categories.map(c => c.category).filter(Boolean)
+      totalPages: Math.ceil(Number(total) / limit),
+      types: uniqueTypes
     })
     
   } catch (error) {
@@ -110,31 +139,54 @@ export async function POST(request: NextRequest) {
     }
 
     const tokenData = await validateRefreshToken(refreshCookie.value)
-    if (!tokenData || !tokenData.user) {
+    if (!tokenData) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
     
-    // Check if user is admin
-    if (tokenData.user.roleId !== 1 && tokenData.user.email !== 'marti@fitq.studio') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Load user from database
+    const user = await prisma.users.findUnique({ where: { id: Number(tokenData.userId) } })
+    if (!user || !user.is_admin) {
+      return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 })
     }
 
     const body = await request.json()
     
-    const product = await prisma.product.create({
+    // Validate required fields
+    if (!body.trainer_id || !body.name || !body.type || !body.price || !body.currency) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Create product
+    const product = await prisma.products.create({
       data: {
+        trainer_id: BigInt(body.trainer_id),
         name: body.name,
-        description: body.description,
-        price: parseFloat(body.price),
-        sku: body.sku,
-        stockQuantity: parseInt(body.stockQuantity) || 0,
-        category: body.category,
-        imageUrl: body.imageUrl,
-        isActive: body.isActive !== false
+        description: body.description || '',
+        type: body.type,
+        price: body.price,
+        discounted_price: body.discounted_price || null,
+        currency: body.currency,
+        max_use_count: body.max_use_count || 1,
+        expires_in_days: body.expires_in_days || 0,
+        contract_length_in_months: body.contract_length_in_months || null,
+        program_id: body.program_id ? BigInt(body.program_id) : null,
+        trainer_ticket_category_id: body.trainer_ticket_category_id || null,
+        created_at: new Date(),
+        updated_at: new Date()
       }
     })
 
-    return NextResponse.json(product)
+    return NextResponse.json({
+      success: true,
+      product: {
+        ...product,
+        id: Number(product.id),
+        trainer_id: Number(product.trainer_id),
+        program_id: product.program_id ? Number(product.program_id) : null,
+        price: Number(product.price),
+        discounted_price: product.discounted_price ? Number(product.discounted_price) : null
+      }
+    })
     
   } catch (error) {
     console.error('Error creating product:', error)

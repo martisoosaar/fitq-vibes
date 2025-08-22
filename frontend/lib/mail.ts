@@ -1,9 +1,11 @@
 import sgMail from '@sendgrid/mail';
 
-// Initialize SendGrid with API key
+// Initialize SendGrid with API key (only if provided)
 const apiKey = process.env.SENDGRID_API_KEY || '';
 console.log('SendGrid API Key configured:', apiKey ? `Yes (${apiKey.substring(0, 10)}...)` : 'No');
-sgMail.setApiKey(apiKey);
+if (apiKey) {
+  sgMail.setApiKey(apiKey);
+}
 
 export async function sendLoginCode(email: string, code: string, challengeId: string) {
   const fromAddress = process.env.MAIL_FROM_ADDRESS || 'no-reply@fitq.local';
@@ -11,6 +13,17 @@ export async function sendLoginCode(email: string, code: string, challengeId: st
   const loginUrl = `${baseUrl}/login?challenge=${challengeId}&code=${code}`;
   
   console.log('Sending email from:', fromAddress, 'to:', email);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[DEV] Login code for ${email}: ${code}`);
+    console.log(`[DEV] Login URL: ${loginUrl}`);
+  }
+  // Dev fallback: if no SENDGRID_API_KEY, log the code and return
+  if (!apiKey) {
+    console.warn('[DEV] SENDGRID_API_KEY not configured. Using console fallback for login code.');
+    console.log(`[DEV] Login code for ${email}: ${code}`);
+    console.log(`[DEV] Login URL: ${loginUrl}`);
+    return { mocked: true } as any;
+  }
   
   const msg = {
     to: email,

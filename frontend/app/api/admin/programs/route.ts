@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,15 +10,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     
     const where: any = {
-      deletedAt: null
+      deleted_at: null
     }
     
     if (search) {
       where.OR = [
         { title: { contains: search } },
-        { shortDescription: { contains: search } },
-        { urlSlug: { contains: search } },
-        { trainer: { name: { contains: search } } }
+        { short_description: { contains: search } },
+        { url_slug: { contains: search } }
       ]
     }
     
@@ -29,33 +26,45 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         title: true,
-        shortDescription: true,
+        short_description: true,
         picture: true,
-        urlSlug: true,
+        url_slug: true,
         status: true,
-        unitLength: true,
-        languageId: true,
-        commentsEnabled: true,
-        feedbackEnabled: true,
-        createdAt: true,
-        trainer: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
+        unit_length: true,
+        language_id: true,
+        comments_enabled: true,
+        feedback_enabled: true,
+        created_at: true,
+        trainer_id: true
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       },
       take: 500
     })
 
-    // Transform BigInt to number for JSON serialization
+    // Get trainer info for programs
+    const trainerIds = [...new Set(programs.map(p => p.trainer_id).filter(Boolean))]
+    const trainers = await prisma.users.findMany({
+      where: { id: { in: trainerIds } },
+      select: { id: true, name: true, email: true }
+    })
+    const trainerMap = new Map(trainers.map(t => [t.id, t]))
+    
+    // Transform programs with trainer info
     const transformedPrograms = programs.map(program => ({
-      ...program,
-      id: Number(program.id)
+      id: Number(program.id),
+      title: program.title,
+      shortDescription: program.short_description,
+      picture: program.picture,
+      urlSlug: program.url_slug,
+      status: program.status,
+      unitLength: program.unit_length,
+      languageId: program.language_id,
+      commentsEnabled: Boolean(program.comments_enabled),
+      feedbackEnabled: Boolean(program.feedback_enabled),
+      createdAt: program.created_at,
+      trainer: trainerMap.get(program.trainer_id) || null
     }))
 
     return NextResponse.json(transformedPrograms)

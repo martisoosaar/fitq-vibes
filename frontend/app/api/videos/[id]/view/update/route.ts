@@ -19,11 +19,11 @@ export async function POST(
     }
 
     const tokenData = await validateRefreshToken(refreshCookie.value)
-    if (!tokenData || !tokenData.user) {
+    if (!tokenData) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
     
-    const userId = tokenData.user.id
+    const userId = Number(tokenData.userId)
 
     const videoId = parseInt(id)
     if (isNaN(videoId)) {
@@ -38,7 +38,7 @@ export async function POST(
     }
 
     // Get video duration for completion check
-    const video = await prisma.video.findUnique({
+    const video = await prisma.videos.findUnique({
       where: { id: videoId },
       select: {
         duration: true
@@ -73,19 +73,18 @@ export async function POST(
     }
 
     // Update the viewing session with capped values
-    const updatedView = await prisma.videoView.update({
+    const updatedView = await prisma.video_time_watched_by_users.update({
       where: { id: viewId },
       data: {
-        watchTimeSeconds: cappedWatchTime,
-        playheadPosition: cappedPlayhead,
-        stillWatching: !shouldComplete && !isComplete,
-        updatedAt: new Date()
+        watch_time_seconds: cappedWatchTime,
+        playhead_position: cappedPlayhead,
+        updated_at: new Date()
       }
     })
 
     return NextResponse.json({
       success: true,
-      stillWatching: updatedView.stillWatching,
+      stillWatching: !shouldComplete, // Calculate from completion logic
       isComplete: shouldComplete
     })
   } catch (error) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../../contexts/AuthContext'
@@ -80,6 +80,8 @@ export default function VideosPage() {
   const [selectedSort, setSelectedSort] = useState<string>('newest')
   const [hasMore, setHasMore] = useState(false)
   const [offset, setOffset] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const loadingRef = useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
   
@@ -91,9 +93,45 @@ export default function VideosPage() {
     fetchVideos(true)
   }, [selectedCategory, selectedLanguage, selectedDuration, selectedEquipment, selectedSort, searchQuery])
 
+  // Infinite scroll effect (gentle trigger)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !isLoadingMore) {
+          // Add small delay to prevent aggressive loading
+          setTimeout(() => {
+            if (hasMore && !isLoadingMore) {
+              loadMoreVideos()
+            }
+          }, 500)
+        }
+      },
+      { threshold: 0.5, rootMargin: '100px' } // Trigger when 50% visible + 100px margin
+    )
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasMore, loading, isLoadingMore])
+
+  const loadMoreVideos = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
+    
+    try {
+      setIsLoadingMore(true)
+      await fetchVideos(false)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, offset, selectedCategory, selectedLanguage, selectedDuration, selectedEquipment, selectedSort, searchQuery])
+
   const fetchVideos = async (reset = false) => {
     try {
-      setLoading(true)
+      if (reset) {
+        setLoading(true)
+      }
       
       const params = new URLSearchParams({
         limit: '30',
@@ -132,7 +170,8 @@ export default function VideosPage() {
           setVideos(prev => [...prev, ...data.videos])
           setOffset(prev => prev + 30)
         }
-        setHasMore(data.hasMore)
+        setHasMore(Boolean(data.hasMore))
+
         
         // Set categories if not already set
         if (data.categories && categories.length === 0) {
@@ -147,7 +186,9 @@ export default function VideosPage() {
     } catch (error) {
       console.error('Failed to fetch videos:', error)
     } finally {
-      setLoading(false)
+      if (reset) {
+        setLoading(false)
+      }
     }
   }
 
@@ -233,6 +274,40 @@ export default function VideosPage() {
                     }`}
                   >
                     {category.name.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {/* Language Filter */}
+            {languages.length > 0 && (
+              <div className="flex flex-wrap gap-3 justify-center">
+                <button
+                  onClick={() => setSelectedLanguage(null)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    selectedLanguage === null
+                      ? 'bg-[#40b236] text-white'
+                      : 'bg-[#3e4551] hover:bg-[#4d5665]'
+                  }`}
+                >
+                  Kõik keeled
+                </button>
+                {languages.map((language) => (
+                  <button
+                    key={language.id}
+                    onClick={() => setSelectedLanguage(language.id)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      selectedLanguage === language.id
+                        ? 'bg-[#40b236] text-white'
+                        : 'bg-[#3e4551] hover:bg-[#4d5665]'
+                    }`}
+                  >
+                    {language.name === 'estonian' ? '🇪🇪 Eesti' :
+                     language.name === 'english' ? '🇬🇧 English' :
+                     language.name === 'russian' ? '🇷🇺 Русский' :
+                     language.name === 'latvian' ? '🇱🇻 Latviešu' :
+                     language.name === 'lithuanian' ? '🇱🇹 Lietuvių' :
+                     language.name}
                   </button>
                 ))}
               </div>
@@ -346,8 +421,17 @@ export default function VideosPage() {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
-                          target.onerror = null
-                          target.src = '/images/video-placeholder.png'
+                          const currentSrc = target.src
+                          
+                          // Try alternative format if current fails
+                          if (currentSrc.includes('.jpg')) {
+                            target.src = currentSrc.replace('.jpg', '.png')
+                          } else if (currentSrc.includes('.png')) {
+                            target.src = currentSrc.replace('.png', '.jpg')
+                          } else {
+                            target.onerror = null
+                            target.src = '/images/video-placeholder.png'
+                          }
                         }}
                       />
                     ) : (
@@ -371,7 +455,7 @@ export default function VideosPage() {
                         Premium
                       </div>
                     )}
-                    {video.language && (
+                    {video.language && video.language.name && (
                       <div className="absolute top-2 right-2 text-2xl" title={video.language.name.charAt(0).toUpperCase() + video.language.name.slice(1)}>
                         {video.language.abbr === 'en' && '🇬🇧'}
                         {video.language.abbr === 'est' && '🇪🇪'}
@@ -392,17 +476,35 @@ export default function VideosPage() {
                   </h3>
                   <div className="flex items-center justify-between text-sm mb-2">
                     <span className="text-[#60cc56] font-medium capitalize">
-                      {video.category.replace('_', ' ')}
+                      {video.category ? video.category.replace('_', ' ') : 'Kategooriata'}
                     </span>
-                    {/* Show main trainer */}
-                    {video.trainer && (
-                      <Link 
-                        href={`/profile/${video.trainer.slug}`}
-                        className="text-gray-300 hover:text-white transition-colors"
-                      >
-                        {video.trainer.name}
-                      </Link>
-                    )}
+                    {/* Show main trainer and co-trainers */}
+                    <div className="flex flex-wrap gap-1">
+                      {video.trainer && (
+                        <Link 
+                          href={`/profile/${video.trainer.slug}`}
+                          className="text-gray-300 hover:text-white transition-colors"
+                        >
+                          {video.trainer.name}
+                        </Link>
+                      )}
+                      {video.trainers && video.trainers.length > 0 && (
+                        <>
+                          {video.trainer && <span className="text-gray-500">, </span>}
+                          {video.trainers.map((coTrainer, index) => (
+                            <span key={coTrainer.id}>
+                              <Link 
+                                href={`/profile/${coTrainer.slug}`}
+                                className="text-gray-300 hover:text-white transition-colors"
+                              >
+                                {coTrainer.name}
+                              </Link>
+                              {index < video.trainers!.length - 1 && <span className="text-gray-500">, </span>}
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-400">
                     <span className="flex items-center gap-1">
@@ -427,15 +529,29 @@ export default function VideosPage() {
           </div>
         )}
         
-        {/* Load More Button */}
-        {!loading && hasMore && videos.length > 0 && (
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => fetchVideos(false)}
-              className="px-6 py-3 bg-[#40b236] hover:bg-[#60cc56] text-white font-medium rounded-lg transition-colors"
-            >
-              Laadi rohkem videosid
-            </button>
+        {/* Infinite scroll trigger + Load More Button fallback */}
+        {hasMore && (
+          <div className="mt-8">
+            {/* Invisible trigger for infinite scroll */}
+            <div ref={loadingRef} className="h-4"></div>
+            
+            {/* Always show load more button as fallback */}
+            <div className="flex justify-center py-8">
+              {isLoadingMore ? (
+                <div className="flex items-center gap-2 text-gray-400">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#40b236]"></div>
+                  <span>Laadin videosid...</span>
+                </div>
+              ) : (
+                <button
+                  onClick={loadMoreVideos}
+                  disabled={isLoadingMore}
+                  className="px-6 py-3 bg-[#40b236] hover:bg-[#60cc56] text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Laadi rohkem videosid
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

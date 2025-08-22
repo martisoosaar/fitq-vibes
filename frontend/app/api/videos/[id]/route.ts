@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
@@ -18,168 +16,231 @@ export async function GET(
       )
     }
 
-    // Get video with all relations
-    const video = await prisma.video.findFirst({
-      where: {
-        id: videoId,
-        videoDeleted: false
-      },
-      include: {
+    // Get video from legacy videos table
+    const video = await prisma.videos.findUnique({
+      where: { id: videoId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        duration: true,
         category: true,
-        trainer: true,
-        language: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-            externalAvatar: true,
-            profileDesc: true
-          }
-        },
-        trainers: {
-          include: {
-            trainer: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                avatar: true,
-                externalAvatar: true
-              }
-            }
-          }
-        },
-        musicCopyrights: {
-          select: {
-            id: true,
-            title: true,
-            artist: true,
-            data: true
-          }
-        }
+        user_id: true,
+        views: true,
+        vimeo_id: true,
+        video_preview: true,
+        keywords: true,
+        created_at: true,
+        video_language: true,
+        video_deleted: true,
+        iframe: true,
+        equipment: true
       }
     })
 
-    if (!video) {
+
+    
+    if (!video || video.video_deleted === 1) {
       return NextResponse.json(
         { error: 'Video not found' },
         { status: 404 }
       )
     }
 
-    // Note: View count is now tracked via /track endpoint when user actually watches
-
-    // Format video data
-    let thumbnail = null
-    if (video.videoPreview && video.videoPreview.startsWith('/images/')) {
-      // Local thumbnail
-      thumbnail = video.videoPreview
-    } else if (video.videoPreviewExternal) {
-      thumbnail = video.videoPreviewExternal
-    } else if (video.videoPreview) {
-      if (video.videoPreview.startsWith('http')) {
-        thumbnail = video.videoPreview
-      } else {
-        thumbnail = `https://old.fitq.me/storage/${video.videoPreview}`
+    // Auto-cleanup: Mark old viewing sessions as completed (pseudo-cronjob)
+    try {
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+      
+      const cleanupResult = await prisma.video_time_watched_by_users.updateMany({
+        where: {
+          updated_at: {
+            lt: oneWeekAgo
+          },
+          completed_at: null // Only update uncompleted sessions
+        },
+        data: {
+          completed_at: new Date()
+        }
+      })
+      
+      if (cleanupResult.count > 0) {
+        console.log(`🧹 Auto-cleanup: Marked ${cleanupResult.count} old viewing sessions as completed`)
       }
+    } catch (cleanupError) {
+      console.error('Auto-cleanup error (non-critical):', cleanupError)
+      // Don't fail the whole request if cleanup fails
     }
 
-    // Format duration
-    const minutes = Math.floor((video.duration || 0) / 60)
-    const seconds = (video.duration || 0) % 60
-    const formattedDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`
-
-    // Get related videos from same category
-    const relatedVideos = await prisma.video.findMany({
-      where: {
-        categoryId: video.categoryId,
-        videoDeleted: false,
-        id: { not: videoId }
-      },
-      take: 6,
-      orderBy: { views: 'desc' },
-      include: {
-        category: true,
-        trainer: true
+    // Get trainer info
+    const trainer = await prisma.users.findUnique({
+      where: { id: video.user_id },
+      select: {
+        id: true,
+        name: true,
+        simple_link: true,
+        avatar: true,
+        external_avatar: true,
+        profile_desc: true
       }
     })
 
-    const formattedRelated = relatedVideos.map(v => ({
-      id: v.id,
-      title: v.title,
-      duration: `${Math.floor((v.duration || 0) / 60)}:${((v.duration || 0) % 60).toString().padStart(2, '0')}`,
-      thumbnail: v.videoPreview && v.videoPreview.startsWith('/images/') 
-                ? v.videoPreview
-                : v.videoPreviewExternal || 
-                  (v.videoPreview ? 
-                    (v.videoPreview.startsWith('http') ? v.videoPreview : `https://old.fitq.me/storage/${v.videoPreview}`) 
-                    : '/images/video-placeholder.png'),
-      category: v.category?.name || 'Unknown',
-      trainer: v.trainer ? {
-        name: v.trainer.name,
-        slug: v.trainer.slug
-      } : null,
-      views: v.views || 0
+    // Get co-trainers
+    const coTrainers = await prisma.videoTrainer.findMany({
+      where: { video_id: videoId },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            simple_link: true,
+            avatar: true,
+            external_avatar: true
+          }
+        }
+      }
+    })
+
+    // Get category name
+    const category = await prisma.video_categories.findUnique({
+      where: { id: video.category },
+      select: { id: true, name: true }
+    })
+
+    // Get language info
+    const language = await prisma.languages.findUnique({
+      where: { id: parseInt(video.video_language || '2') },
+      select: { id: true, language_name: true, language_abbr: true }
+    })
+
+    // Format trainer avatar
+    let trainerAvatar = null
+    if (trainer) {
+      if (trainer.external_avatar) {
+        trainerAvatar = trainer.external_avatar
+      } else if (trainer.avatar) {
+        if (trainer.avatar.startsWith('http') || trainer.avatar.startsWith('/')) {
+          trainerAvatar = trainer.avatar
+        } else {
+          trainerAvatar = `/${trainer.avatar}`
+        }
+      }
+    }
+
+    // Format video thumbnail
+    let thumbnail = null
+    if (video.video_preview) {
+      if (video.video_preview.startsWith('/images/')) {
+        thumbnail = video.video_preview
+      } else {
+        thumbnail = `/images/video-thumbnails/video-${video.id}.jpg`
+      }
+    } else {
+      thumbnail = `/images/video-thumbnails/video-${video.id}.jpg`
+    }
+
+    // Format co-trainers
+    const formattedCoTrainers = coTrainers.map(ct => {
+      let coTrainerAvatar = null
+      if (ct.users.external_avatar) {
+        coTrainerAvatar = ct.users.external_avatar
+      } else if (ct.users.avatar) {
+        if (ct.users.avatar.startsWith('http') || ct.users.avatar.startsWith('/')) {
+          coTrainerAvatar = ct.users.avatar
+        } else {
+          coTrainerAvatar = `/${ct.users.avatar}`
+        }
+      }
+
+      return {
+        id: Number(ct.users.id),
+        name: ct.users.name || '',
+        avatar: coTrainerAvatar,
+        slug: ct.users.simple_link || ct.users.name?.toLowerCase().replace(/\s+/g, '-') || `user-${ct.users.id}`
+      }
+    })
+
+    // Get related videos (same category, different video)
+    const relatedVideos = await prisma.videos.findMany({
+      where: {
+        category: video.category,
+        id: { not: videoId },
+        OR: [
+          { video_deleted: 0 },
+          { video_deleted: null }
+        ]
+      },
+      select: {
+        id: true,
+        title: true,
+        duration: true,
+        views: true,
+        user_id: true
+      },
+      take: 6,
+      orderBy: { views: 'desc' }
+    })
+
+    // Format related videos with thumbnails
+    const formattedRelatedVideos = relatedVideos.map(rv => ({
+      id: rv.id,
+      title: rv.title,
+      duration: `${Math.floor((rv.duration || 0) / 60)}:${((rv.duration || 0) % 60).toString().padStart(2, '0')}`,
+      thumbnail: `/images/video-thumbnails/video-${rv.id}.jpg`,
+      category: category?.name || '',
+      trainer: null, // Will be filled if needed
+      views: rv.views || 0
     }))
 
+    // Format response to match original structure
     const response = {
       id: video.id,
       title: video.title,
       description: video.description,
-      duration: formattedDuration,
-      durationSeconds: video.duration,
-      category: video.category?.name || 'Unknown',
-      categoryId: video.categoryId,
-      thumbnail: thumbnail || '/images/video-placeholder.png',
-      views: video.views || 0, // Show actual tracked views
-      language: video.language ? {
-        id: video.language.id,
-        languageName: video.language.languageName,
-        languageAbbr: video.language.languageAbbr,
-        languageFlag: video.language.languageFlag
+      duration: `${Math.floor((video.duration || 0) / 60)}:${((video.duration || 0) % 60).toString().padStart(2, '0')}`,
+      durationSeconds: video.duration || 0,
+      category: category?.name || '',
+      categoryId: video.category,
+      thumbnail: thumbnail,
+      views: video.views || 0,
+      language: language ? {
+        id: language.id,
+        languageName: language.language_name,
+        languageAbbr: language.language_abbr,
+        languageFlag: null
       } : null,
-      trainer: video.trainer ? {
-        id: video.trainerId,
-        name: video.trainer.name,
-        slug: video.trainer.slug,
-        avatar: video.trainer.avatar
+      trainer: trainer ? {
+        id: Number(trainer.id),
+        name: trainer.name || '',
+        slug: trainer.simple_link || trainer.name?.toLowerCase().replace(/\s+/g, '-') || `user-${trainer.id}`,
+        avatar: trainerAvatar
       } : null,
-      trainers: video.trainers.map(vt => ({
-        id: vt.trainer.id,
-        name: vt.trainer.name || vt.trainer.email,
-        avatar: vt.trainer.externalAvatar || vt.trainer.avatar,
-        slug: vt.trainer.name ? vt.trainer.name.toLowerCase().replace(/\s+/g, '') : vt.trainer.id.toString()
-      })),
-      user: {
-        id: video.user.id,
-        name: video.user.name || 'Unknown',
-        avatar: video.user.avatar || video.user.externalAvatar,
-        description: video.user.profileDesc
-      },
-      isPremium: !video.openForFree,
-      isFree: video.openForFree,
-      openForSubscribers: video.openForSubscribers,
-      openForTickets: video.openForTickets,
-      singleTicketPrice: video.singleTicketPrice,
-      playbackUrl: video.playbackUrl,
-      vimeoId: video.vimeoId,
+      trainers: formattedCoTrainers,
+      user: trainer ? {
+        id: Number(trainer.id),
+        name: trainer.name || '',
+        avatar: trainerAvatar,
+        description: trainer.profile_desc
+      } : { id: 0, name: 'Unknown', avatar: null, description: null },
+      isPremium: false, // Default for legacy videos
+      isFree: true,
+      openForSubscribers: true,
+      openForTickets: false,
+      singleTicketPrice: 0,
+      playbackUrl: null,
+      vimeoId: video.vimeo_id,
       iframe: video.iframe,
-      videoLanguage: video.videoLanguage,
+      videoLanguage: video.video_language,
       equipment: video.equipment,
       keywords: video.keywords,
-      energyConsumption: video.energyConsumption,
-      createdAt: video.createdAt,
-      relatedVideos: formattedRelated,
-      musicCopyrights: video.musicCopyrights
+      energyConsumption: null, // Not available in current select
+      createdAt: video.created_at,
+      relatedVideos: formattedRelatedVideos
     }
 
     return NextResponse.json(response)
   } catch (error) {
     console.error('Failed to fetch video:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch video' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch video' }, { status: 500 })
   }
 }

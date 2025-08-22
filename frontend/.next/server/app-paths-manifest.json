@@ -1,10 +1,11 @@
 {
   "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/user/profile/route": "app/api/user/profile/route.js",
-  "/trainers/page": "app/trainers/page.js",
-  "/profile/[username]/page": "app/profile/[username]/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/videos/page": "app/videos/page.js",
-  "/settings/account/page": "app/settings/account/page.js",
-  "/settings/page": "app/settings/page.js"
+  "/api/videos/[id]/view/update/route": "app/api/videos/[id]/view/update/route.js",
+  "/api/videos/[id]/view/resume/route": "app/api/videos/[id]/view/resume/route.js",
+  "/api/admin/video-views/route": "app/api/admin/video-views/route.js",
+  "/api/videos/route": "app/api/videos/route.js",
+  "/api/admin/users/route": "app/api/admin/users/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/videos/page": "app/videos/page.js"
 }

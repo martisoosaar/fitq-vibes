@@ -27,11 +27,11 @@ export async function POST(
     }
 
     const tokenData = await validateRefreshToken(refreshCookie.value)
-    if (!tokenData || !tokenData.user) {
+    if (!tokenData) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
     
-    const userId = tokenData.user.id
+    const userId = Number(tokenData.userId)
     const videoId = parseInt(id)
     
     if (isNaN(videoId)) {
@@ -39,11 +39,11 @@ export async function POST(
     }
 
     // Find and reopen the session
-    const existingView = await prisma.videoView.findFirst({
+    const existingView = await prisma.video_time_watched_by_users.findFirst({
       where: {
         id: viewId,
-        videoId,
-        userId
+        video_id: videoId,
+        user_id: userId
       }
     })
 
@@ -52,20 +52,19 @@ export async function POST(
     }
 
     // Reopen the session if it was closed
-    const updatedView = await prisma.videoView.update({
+    const updatedView = await prisma.video_time_watched_by_users.update({
       where: { id: viewId },
       data: {
-        stillWatching: true,
-        updatedAt: new Date()
+        updated_at: new Date()
       }
     })
 
-    console.log('Resumed session:', updatedView.id, 'with watch time:', updatedView.watchTimeSeconds, 'playhead:', updatedView.playheadPosition)
+    console.log('Resumed session:', updatedView.id, 'with watch time:', updatedView.watch_time_seconds)
 
     return NextResponse.json({
-      viewId: updatedView.id,
-      playheadPosition: updatedView.playheadPosition,
-      watchTimeSeconds: updatedView.watchTimeSeconds,
+      viewId: Number(updatedView.id),
+      playheadPosition: updatedView.playhead_position || updatedView.watch_time_seconds, // Use playhead if available
+      watchTimeSeconds: updatedView.watch_time_seconds,
       resuming: true
     })
     

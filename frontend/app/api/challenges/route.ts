@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
     const challenges = await prisma.challenge.findMany({
       where: {
-        challengeVisible: 1
+        challenge_visible: 1
       },
       select: {
         id: true,
@@ -15,23 +13,16 @@ export async function GET(request: NextRequest) {
         description: true,
         image: true,
         path: true,
-        beginDate: true,
-        endDate: true,
-        minTeam: true,
-        maxTeam: true,
-        isSubscriptionNeeded: true,
+        begin_date: true,
+        end_date: true,
+        min_team: true,
+        max_team: true,
+        is_subscription_needed: true,
         type: true,
-        userId: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true
-          }
-        }
+        user_id: true,
       },
       orderBy: {
-        beginDate: 'desc'
+        begin_date: 'desc'
       }
     })
 
@@ -58,22 +49,17 @@ export async function GET(request: NextRequest) {
         description: challenge.description || '',
         image: imageUrl,
         path: challenge.path || `challenge-${challenge.id}`,
-        beginDate: challenge.beginDate,
-        endDate: challenge.endDate,
-        maxTeam: challenge.maxTeam || 1,
-        minTeam: challenge.minTeam || 1,
-        isSubscriptionNeeded: challenge.isSubscriptionNeeded === 1,
+        beginDate: challenge.begin_date,
+        endDate: challenge.end_date,
+        maxTeam: challenge.max_team || 1,
+        minTeam: challenge.min_team || 1,
+        isSubscriptionNeeded: challenge.is_subscription_needed === 1,
         type: challenge.type,
-        trainer: challenge.user ? {
-          id: challenge.user.id,
-          name: challenge.user.name || 'Treener',
-          avatar: challenge.user.avatar?.startsWith('/') ? challenge.user.avatar : `/${challenge.user.avatar || 'users/default.png'}`,
-          slug: challenge.user.name?.toLowerCase().replace(/\s+/g, '') || `user-${challenge.user.id}`
-        } : null
+        trainer: null // Temporarily null until we fix user relation
       }
     })
 
-    return NextResponse.json(transformedChallenges)
+    return NextResponse.json({ challenges: transformedChallenges })
   } catch (error) {
     console.error('Failed to fetch challenges:', error)
     return NextResponse.json({ error: 'Failed to fetch challenges' }, { status: 500 })

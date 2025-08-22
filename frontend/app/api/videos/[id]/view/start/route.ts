@@ -30,12 +30,12 @@ export async function POST(
     }
 
     const tokenData = await validateRefreshToken(refreshCookie.value)
-    if (!tokenData || !tokenData.user) {
+    if (!tokenData) {
       console.log('Invalid token')
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
     
-    const userId = tokenData.user.id
+    const userId = Number(tokenData.userId)
     console.log('User ID from cookie:', userId)
 
     const videoId = parseInt(id)
@@ -45,11 +45,11 @@ export async function POST(
     }
 
     // Get video details
-    const video = await prisma.video.findUnique({
+    const video = await prisma.videos.findUnique({
       where: { id: videoId },
       select: {
         id: true,
-        trainerId: true,
+        user_id: true,
         duration: true
       }
     })
@@ -58,129 +58,31 @@ export async function POST(
       console.log('Video not found:', videoId)
       return NextResponse.json({ error: 'Video not found' }, { status: 404 })
     }
-    
+
     console.log('Found video:', video)
 
-    // Close old viewing sessions (older than 1 week)
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    
-    await prisma.videoView.updateMany({
-      where: {
-        userId,
-        createdAt: {
-          lt: oneWeekAgo
-        },
-        stillWatching: true
-      },
+    // Create simple viewing session in legacy table
+    const newView = await prisma.video_time_watched_by_users.create({
       data: {
-        stillWatching: false
+        user_id: userId,
+        video_id: videoId,
+        trainer_id: video.user_id || 0,
+        watch_time_seconds: 0,
+        created_at: new Date(),
+        updated_at: new Date()
       }
     })
 
-    // If not forcing new, check for existing sessions
-    if (!forceNew) {
-      // Check for existing active viewing session
-      const existingView = await prisma.videoView.findFirst({
-        where: {
-          videoId,
-          userId,
-          stillWatching: true,
-          createdAt: {
-            gte: oneWeekAgo
-          }
-        },
-        orderBy: {
-          updatedAt: 'desc'
-        }
-      })
-
-      if (existingView) {
-        console.log('Found existing view session:', existingView)
-        // Resume existing session
-        return NextResponse.json({
-          viewId: existingView.id,
-          playheadPosition: existingView.playheadPosition,
-          watchTimeSeconds: existingView.watchTimeSeconds,
-          resuming: true,
-          updatedAt: existingView.updatedAt
-        })
-      }
-    }
-
-    // Check if there's a completed session within the last week that we can show for resume
-    // Only if not forcing new session
-    if (!forceNew) {
-      const recentCompletedView = await prisma.videoView.findFirst({
-        where: {
-          videoId,
-          userId,
-          stillWatching: false,
-          createdAt: {
-            gte: oneWeekAgo
-          }
-        },
-        orderBy: {
-          updatedAt: 'desc'
-        }
-      })
-
-      if (recentCompletedView && recentCompletedView.playheadPosition > 0) {
-        const videoDurationSeconds = video.duration || 0
-        const percentageWatched = videoDurationSeconds > 0 
-          ? (recentCompletedView.playheadPosition / videoDurationSeconds) * 100 
-          : 0
-        
-        // If video was less than 80% complete, offer to resume
-        if (percentageWatched < 80) {
-          console.log('Found recent completed session that can be resumed:', recentCompletedView)
-          // Reopen the session for continuation
-          const reopenedView = await prisma.videoView.update({
-            where: { id: recentCompletedView.id },
-            data: {
-              stillWatching: true,
-              updatedAt: new Date()
-            }
-          })
-          
-          return NextResponse.json({
-            viewId: reopenedView.id,
-            playheadPosition: reopenedView.playheadPosition,
-            watchTimeSeconds: reopenedView.watchTimeSeconds,
-            resuming: true,
-            updatedAt: reopenedView.updatedAt
-          })
-        }
-      }
-    }
-
-    console.log('Creating new view session for user:', userId, 'video:', videoId)
-    
-    // Create new viewing session
-    const newView = await prisma.videoView.create({
-      data: {
-        videoId,
-        userId,
-        trainerId: video.trainerId,
-        watchTimeSeconds: 0,
-        playheadPosition: 0,
-        stillWatching: true
-      }
-    })
-    
-    console.log('Created new view session:', newView)
+    console.log('Created view session:', newView.id)
 
     return NextResponse.json({
       viewId: newView.id,
-      playheadPosition: 0,
       watchTimeSeconds: 0,
-      resuming: false
+      playheadPosition: 0,
+      resumed: false
     })
   } catch (error) {
     console.error('Error starting video view:', error)
-    return NextResponse.json(
-      { error: 'Failed to start video view' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to start video view' }, { status: 500 })
   }
 }

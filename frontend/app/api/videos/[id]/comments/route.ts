@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/db'
 import jwt from 'jsonwebtoken'
-
-const prisma = new PrismaClient()
 
 // GET /api/videos/[id]/comments - Get video comments
 export async function GET(
@@ -34,69 +32,39 @@ export async function GET(
     }
 
     // Get comments with replies and likes
-    const comments = await prisma.videoComment.findMany({
+    const comments = await prisma.video_comments.findMany({
       where: {
-        videoId,
-        parentId: null, // Only top-level comments
-        deletedAt: null
+        video_id: videoId,
+        parent_id: null, // Only top-level comments
+        deleted_at: null
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true
-          }
-        },
-        likes: true,
-        replies: {
-          where: {
-            deletedAt: null
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
-              }
-            },
-            likes: true
-          },
-          orderBy: {
-            createdAt: 'asc'
-          }
-        }
+      select: {
+        id: true,
+        video_id: true,
+        user_id: true,
+        parent_id: true,
+        content: true,
+        created_at: true,
+        updated_at: true
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       }
     })
 
-    // Format comments with like counts and user like status
+    // Return simple comments (no user info for now - will add separately)
     const formattedComments = comments.map(comment => ({
       id: comment.id,
       content: comment.content,
-      createdAt: comment.createdAt,
+      createdAt: comment.created_at,
       user: {
-        id: comment.user.id,
-        name: comment.user.name || 'Unknown',
-        avatar: comment.user.avatar
+        id: comment.user_id,
+        name: 'User ' + comment.user_id, // Temporary - will load user info separately
+        avatar: null
       },
-      likes: comment.likes.length,
-      isLiked: currentUserId ? comment.likes.some(like => like.userId === currentUserId) : false,
-      replies: comment.replies.map(reply => ({
-        id: reply.id,
-        content: reply.content,
-        createdAt: reply.createdAt,
-        user: {
-          id: reply.user.id,
-          name: reply.user.name || 'Unknown',
-          avatar: reply.user.avatar
-        },
-        likes: reply.likes.length,
-        isLiked: currentUserId ? reply.likes.some(like => like.userId === currentUserId) : false
-      }))
+      likes: 0, // Will implement likes later
+      isLiked: false,
+      replies: [] // Will implement replies later
     }))
 
     return NextResponse.json({

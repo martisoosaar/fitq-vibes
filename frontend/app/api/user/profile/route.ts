@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Format avatar URL - for settings page, return CDN URL for old paths
+    // Format avatar URL - for settings page, return local files for user avatars
     let avatarUrl = null
     if (user.externalAvatar) {
       avatarUrl = user.externalAvatar
@@ -90,8 +90,13 @@ export async function GET(request: NextRequest) {
       } else if (user.avatar.startsWith('/')) {
         avatarUrl = user.avatar
       } else {
-        // For old paths like "users/September2020/..." or "users/user_9775/...", use CDN
-        avatarUrl = `https://f5bef85cec4c638e3231-250b1cf964c3a77213444ba2f00d4811.ssl.cf3.rackcdn.com/${user.avatar}`
+        // For old paths like "users/user_73/...", use local files
+        if (user.avatar.includes('user_')) {
+          avatarUrl = `/${user.avatar}`
+        } else {
+          // Fallback to CDN for other paths
+          avatarUrl = `https://f5bef85cec4c638e3231-250b1cf964c3a77213444ba2f00d4811.ssl.cf3.rackcdn.com/${user.avatar}`
+        }
       }
     }
 

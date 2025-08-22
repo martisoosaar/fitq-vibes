@@ -10,12 +10,9 @@ export async function GET(
   try {
     const { slug } = await params
 
-    // Find trainer by slug
-    const trainer = await prisma.trainer.findUnique({
-      where: { slug },
-      include: {
-        programs: true
-      }
+    // Find trainer user by simple_link in legacy users table
+    const trainer = await prisma.users.findFirst({
+      where: { simple_link: slug }
     })
 
     if (!trainer) {
@@ -26,34 +23,39 @@ export async function GET(
     }
 
     // Get associated user data
-    const user = await prisma.user.findUnique({
-      where: { id: trainer.id },
-      select: {
-        profileDesc: true,
-        trainerChannelImage: true,
-        externalAvatar: true
-      }
-    })
+    const user = trainer
 
     // Count followers
-    const followersCount = await prisma.userFollow.count({
-      where: { followingId: trainer.id }
+    const followersCount = await prisma.user_follow.count({
+      where: { following_id: Number(trainer.id) }
     })
 
-    // Use avatar from Trainer table
-    let avatarUrl = trainer.avatar || '/images/trainers/avatar.png'
+    // Use avatar from users table
+    let avatarUrl = null as string | null
+    if (user?.external_avatar) {
+      avatarUrl = user.external_avatar
+    } else if (user?.avatar) {
+      if (user.avatar.startsWith('http')) {
+        avatarUrl = user.avatar
+      } else if (user.avatar.startsWith('/')) {
+        avatarUrl = user.avatar
+      } else {
+        avatarUrl = `/${user.avatar}`
+      }
+    }
+    if (!avatarUrl) avatarUrl = '/images/default-avatar.png'
 
     const trainerData = {
-      id: trainer.id,
-      name: trainer.name,
-      slug: trainer.slug,
+      id: Number(trainer.id),
+      name: trainer.name || '',
+      slug: trainer.simple_link || String(trainer.id),
       avatar: avatarUrl,
-      channelImage: user?.trainerChannelImage || null,
-      description: user?.profileDesc || null,
-      videosCount: trainer.videosCount,
-      videoViews: trainer.videoViews,
+      channelImage: user?.trainer_channel_image || null,
+      description: user?.profile_desc || null,
+      videosCount: undefined as unknown as number,
+      videoViews: trainer.total_video_views || 0,
       subscribersCount: followersCount,
-      hasPrograms: trainer.programs?.length > 0 || false
+      hasPrograms: (await prisma.trainerProgram.count({ where: { trainer_id: Number(trainer.id), deleted_at: null } })) > 0
     }
 
     return NextResponse.json({ trainer: trainerData })

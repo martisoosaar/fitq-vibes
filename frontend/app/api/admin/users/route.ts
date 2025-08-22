@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,33 +22,38 @@ export async function GET(request: NextRequest) {
     }
     
     // Get total count for pagination
-    const totalCount = await prisma.user.count({ where })
+    const totalCount = await prisma.users.count({ where })
     
-    const users = await prisma.user.findMany({
+    const users = await prisma.users.findMany({
       where,
       select: {
         id: true,
         email: true,
         name: true,
-        isAdmin: true,
-        trainerUnlocked: true,
-        createdAt: true,
-        lastLogin: true,
-        totalVideoViews: true,
-        deletedAt: true
+        is_admin: true,
+        trainer_unlocked: true,
+        created_at: true,
+        total_video_views: true
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       },
       skip,
       take: limit
     })
 
-    // Transform trainerUnlocked from number to boolean and add isDeleted flag
+    // Transform to match frontend expectations
     const transformedUsers = users.map(user => ({
-      ...user,
-      trainerUnlocked: user.trainerUnlocked === 1,
-      isDeleted: user.deletedAt !== null
+      id: Number(user.id),
+      email: user.email,
+      name: user.name,
+      isAdmin: Boolean(user.is_admin),
+      trainerUnlocked: user.trainer_unlocked === 1,
+      createdAt: user.created_at,
+      lastLogin: null, // Not available in legacy schema
+      totalVideoViews: user.total_video_views || 0,
+      deletedAt: null, // Not available in legacy schema
+      isDeleted: false
     }))
 
     return NextResponse.json({
